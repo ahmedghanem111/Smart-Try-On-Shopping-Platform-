@@ -1,4 +1,4 @@
-import Navbar from "../components/home/Navbar";
+import Navbar from "../../components/home/Navbar";
 
 export default function Products() {
   return (
