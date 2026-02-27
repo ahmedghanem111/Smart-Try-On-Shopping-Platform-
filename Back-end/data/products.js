@@ -40,7 +40,7 @@ const products = [
 
     // --- BAGS ---
     {
-        name: 'Leather Crossbody Bag',
+        name: 'Leather CrossBody Bag',
         image: '/images/bag.jpg',
         description: 'Genuine leather bag with adjustable strap.',
         brand: 'Coach',

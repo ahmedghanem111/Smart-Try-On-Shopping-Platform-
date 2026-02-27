@@ -1,0 +1,5 @@
+node_modules/
+.env
+Back-end/node_modules/
+uploads/
+*.docx
