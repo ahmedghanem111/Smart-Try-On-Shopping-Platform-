@@ -1,27 +1,86 @@
 const express = require('express');
 const router = express.Router();
-const { check } = require('express-validator');
-const {
-    getProducts,
-    getProductById,
-    deleteProduct,
-    updateProduct,
-    createProduct
-} = require('../controllers/productController');
+const { getProducts, getProductById, deleteProduct, updateProduct, createProduct, createProductReview } = require('../controllers/productController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
-const validateProduct = [
-    check('name', 'Name is required').not().isEmpty(),
-    check('price', 'Price must be a number').isNumeric(),
-    check('category', 'Category is required').not().isEmpty(),
-];
-
-router.route('/').get(getProducts);
-router.route('/:id').get(getProductById);
-
-router.route('/').post(protect, admin, validateProduct, createProduct);
-router.route('/:id')
-    .delete(protect, admin, deleteProduct)
-    .put(protect, admin, updateProduct);
+/**
+ * @swagger
+ * /api/products:
+ *   get:
+ *     summary: Get products
+ *     tags: [Products]
+ *     responses:
+ *       200:
+ *         description: Success
+ *   post:
+ *     summary: Create product
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       201:
+ *         description: Created
+ *
+ * /api/products/{id}:
+ *   get:
+ *     summary: Product by ID
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *   put:
+ *     summary: Update product
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Updated
+ *   delete:
+ *     summary: Delete product
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Deleted
+ *
+ * /api/products/{id}/reviews:
+ *   post:
+ *     summary: Create review
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       201:
+ *         description: Reviewed
+ */
+router.route('/').get(getProducts).post(protect, admin, createProduct);
+router.route('/:id').get(getProductById).put(protect, admin, updateProduct).delete(protect, admin, deleteProduct);
+router.route('/:id/reviews').post(protect, createProductReview);
 
 module.exports = router;

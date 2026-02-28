@@ -7,19 +7,40 @@ const path = require('path');
 const productRoutes = require('./routes/productRoutes');
 const userRoutes = require('./routes/userRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const cartRoutes = require('./routes/cartRoutes');
+const wishlistRoutes = require('./routes/wishlistRoutes');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
 
-connectDB();
+if (process.env.NODE_ENV !== 'test') {
+    connectDB();
+}
 
 const app = express();
 
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production'
+        ? 'https://live-app.com'
+        : 'http://localhost:5000',
+    credentials: true
+}));
 
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/wishlist', wishlistRoutes);
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    explorer: true,
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: "Fitme API Documentation"
+}));
 
 app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
 
@@ -28,7 +49,11 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(
-  PORT,
-  () => console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.yellow.bold)
-);
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(
+        PORT,
+        () => console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.yellow.bold)
+    );
+}
+
+module.exports = app;
