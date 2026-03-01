@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
+import { loginRequest } from '@/services/authService'
 
 const Login = () => {
   const { login } = useAuth()
@@ -25,21 +26,26 @@ const Login = () => {
     setError('')
 
     try {
-      // Basic validation
+
       if (!formData.email || !formData.password) {
         setError('Please fill in all fields.')
         setLoading(false)
         return
       }
 
-      // Simulate API call delay
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // Use the auth context login (fake logic for now)
-      login(formData.email)
-      router.push('/')
+      const response = await loginRequest(formData)
+      // console.log(response)
+      
+      login(response.data)
+      
+      if (response.data.isAdmin) {
+        router.push('/dashboard')
+      } else {
+        router.push('/')
+      }
     } catch (err) {
-      setError('Invalid email or password. Please try again.')
+      const errorMessage = err.response?.data || 'Invalid email or password. Please try again.'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -65,7 +71,6 @@ const Login = () => {
   return (
     <section className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50/20 dark:from-slate-950 dark:via-purple-950/20 dark:to-blue-950/10 flex items-center justify-center px-4">
 
-      {/* Animated Background Blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
           className="absolute top-20 left-10 w-72 h-72 bg-purple-300/20 dark:bg-purple-600/10 rounded-full blur-3xl"
@@ -242,11 +247,6 @@ const Login = () => {
                 </motion.button>
               </Link>
             </motion.div>
-
-            {/* Admin hint */}
-            <motion.p variants={itemVariants} className="mt-5 text-center text-xs text-slate-400 dark:text-slate-500">
-              Tip: use <span className="text-purple-500 font-medium">admin@test.com</span> to log in as admin
-            </motion.p>
 
           </div>
         </div>

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
+import { registerRequest } from '@/services/authService'
 
 const Register = () => {
   const { login } = useAuth()
@@ -49,19 +50,29 @@ const Register = () => {
     }
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1200))
-      // Auto-login after register using fake auth
-      login(formData.email)
-      router.push('/')
+
+      const response = await registerRequest({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password
+      })
+      // console.log(response)
+
+      login(response.data)
+      
+      if (response.data.isAdmin) {
+        router.push('/dashboard')
+      } else {
+        router.push('/')
+      }
     } catch (err) {
-      setError('Registration failed. Please try again.')
+      const errorMessage = err.response?.data || 'Registration failed. Please try again.'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
   }
 
-  // Password strength
   const getStrength = (password) => {
     if (!password) return { level: 0, label: '', color: '' }
     let score = 0
@@ -97,7 +108,6 @@ const Register = () => {
   return (
     <section className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50/20 dark:from-slate-950 dark:via-purple-950/20 dark:to-blue-950/10 flex items-center justify-center px-4 py-16">
 
-      {/* Animated Background Blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
           className="absolute top-20 right-10 w-72 h-72 bg-purple-300/20 dark:bg-purple-600/10 rounded-full blur-3xl"
@@ -116,18 +126,15 @@ const Register = () => {
         />
       </div>
 
-      {/* Card */}
       <motion.div
         className="relative w-full max-w-md z-10"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
-        {/* Gradient border wrapper */}
         <div className="p-[1.5px] rounded-3xl bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 shadow-2xl shadow-purple-500/20">
           <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-3xl px-8 py-10">
 
-            {/* Header */}
             <motion.div variants={itemVariants} className="text-center mb-8 space-y-3">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/10 to-blue-500/10 dark:from-purple-500/20 dark:to-blue-500/20 border border-purple-300/30 dark:border-purple-500/30 backdrop-blur-sm mb-2">
                 <span className="relative flex h-2 w-2">
@@ -142,7 +149,6 @@ const Register = () => {
               <p className="text-slate-500 dark:text-slate-400 text-sm">Start your AI-powered fashion journey in seconds</p>
             </motion.div>
 
-            {/* Error Message */}
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
@@ -156,10 +162,8 @@ const Register = () => {
               </motion.div>
             )}
 
-            {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
 
-              {/* Full Name */}
               <motion.div variants={itemVariants} className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Full Name</label>
                 <div className="relative">
@@ -179,7 +183,7 @@ const Register = () => {
                 </div>
               </motion.div>
 
-              {/* Email */}
+
               <motion.div variants={itemVariants} className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Email address</label>
                 <div className="relative">
@@ -199,7 +203,6 @@ const Register = () => {
                 </div>
               </motion.div>
 
-              {/* Password */}
               <motion.div variants={itemVariants} className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Password</label>
                 <div className="relative">
@@ -230,7 +233,6 @@ const Register = () => {
                   </button>
                 </div>
 
-                {/* Password Strength */}
                 {formData.password && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
@@ -254,7 +256,6 @@ const Register = () => {
                 )}
               </motion.div>
 
-              {/* Confirm Password */}
               <motion.div variants={itemVariants} className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Confirm Password</label>
                 <div className="relative">

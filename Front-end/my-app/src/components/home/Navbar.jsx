@@ -14,16 +14,16 @@ const Navbar = () => {
 
   const navLinks = [
     { id: 'home', label: 'Home', href: '/' },
-    { id: 'products', label: 'Products', href: '/products' },
-    { id: 'try-on', label: 'Try-On', href: '/try-on' },
+    { id: 'products', label: 'Products', href: '/product' },
     { id: 'categories', label: 'Categories', href: '/categories' },
+    { id: 'try-on', label: 'Try-On', href: '/try-on' },
   ];
 
   return (
     <nav className="  sticky top-0 z-50 bg-gradient-to-r   bg-white/80 dark:bg-black/60 backdrop-blur-md border-b border-purple-400 shadow-lg">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
+
           <Link href="/" className="flex items-center transition-transform duration-300 hover:scale-105">
             <Image
               src="/logo2.png"
@@ -34,7 +34,6 @@ const Navbar = () => {
             />
           </Link>
 
-          {/* Navigation Links - Desktop */}
           <div className="hidden md:flex space-x-1">
             {navLinks.map((link) => (
               <Link
@@ -46,38 +45,50 @@ const Navbar = () => {
               </Link>
             ))}
           </div>
-           {/* Auth Buttons - Desktop */}
 <div className="hidden md:flex items-center space-x-3 ml-4">
   {!user ? (
     <>
       <Link
         href="/login"
-        className="px-4 py-2 text-sm font-medium text-purple-600 hover:text-purple-800"
+        className="px-4 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition-colors duration-300"
       >
         Login
       </Link>
       <Link
         href="/register"
-        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105"
       >
         Register
       </Link>
     </>
   ) : (
     <>
-      {user.role === "admin" && (
+      {user.isAdmin && (
         <Link
           href="/dashboard"
-          className="px-4 py-2 text-sm font-medium text-green-600 hover:text-green-800"
+          className="px-4 py-2 text-sm font-medium text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition-colors duration-300"
         >
           Dashboard
         </Link>
       )}
 
+      <Link
+        href="/profile"
+        className="p-2 rounded-lg bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 dark:hover:bg-purple-500/30 transition-all duration-300 transform hover:scale-110"
+        aria-label="Profile"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      </Link>
+
       <button
         onClick={logout}
-        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+        className="px-4 py-2 bg-gradient-to-r from-slate-600 to-slate-700 dark:from-slate-700 dark:to-slate-800 text-white rounded-lg hover:from-slate-700 hover:to-slate-800 dark:hover:from-slate-800 dark:hover:to-slate-900 transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 flex items-center gap-2"
       >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
         Logout
       </button>
     </>
@@ -131,31 +142,50 @@ const Navbar = () => {
   <>
     <Link
       href="/login"
-      className="block px-3 py-2 font-medium"
+      className="block px-3 py-2 font-medium text-slate-900 dark:text-slate-100 hover:bg-purple-500/30 dark:hover:bg-purple-500/20 hover:text-purple-600 dark:hover:text-purple-400 transition-all duration-300 rounded-md"
+      onClick={() => setIsOpen(false)}
     >
       Login
     </Link>
     <Link
       href="/register"
-      className="block px-3 py-2 font-medium"
+      className="block px-3 py-2 font-medium text-slate-900 dark:text-slate-100 hover:bg-purple-500/30 dark:hover:bg-purple-500/20 hover:text-purple-600 dark:hover:text-purple-400 transition-all duration-300 rounded-md"
+      onClick={() => setIsOpen(false)}
     >
       Register
     </Link>
   </>
 ) : (
   <>
-    {user.role === "admin" && (
+    {user.isAdmin && (
       <Link
         href="/dashboard"
-        className="block px-3 py-2 font-medium"
+        className="block px-3 py-2 font-medium text-green-600 dark:text-green-400 hover:bg-green-500/20 transition-all duration-300 rounded-md"
+        onClick={() => setIsOpen(false)}
       >
         Dashboard
       </Link>
     )}
-    <button
-      onClick={logout}
-      className="block w-full text-left px-3 py-2 font-medium text-red-500"
+    <Link
+      href="/profile"
+      className="block px-3 py-2 font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 transition-all duration-300 rounded-md flex items-center gap-2"
+      onClick={() => setIsOpen(false)}
     >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+      Profile
+    </Link>
+    <button
+      onClick={() => {
+        logout()
+        setIsOpen(false)
+      }}
+      className="block w-full text-left px-3 py-2 font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-500/20 transition-all duration-300 rounded-md flex items-center gap-2"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+      </svg>
       Logout
     </button>
   </>
