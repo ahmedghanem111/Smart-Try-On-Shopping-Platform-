@@ -3,6 +3,7 @@ Back-end/node_modules/
 Front-end/node_modules/
 
 .env
+.env.local
 Back-end/.env
 
 .idea/
@@ -20,3 +21,6 @@ Back-end/uploads/
 
 *.docx
 *.pdf
+.vercel
+.env*.local
+# Vercel

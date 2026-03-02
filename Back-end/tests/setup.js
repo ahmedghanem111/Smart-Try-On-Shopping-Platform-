@@ -4,6 +4,23 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 
+jest.mock('cloudinary', () => ({
+    v2: {
+        uploader: {
+            upload_stream: jest.fn((options, callback) => {
+                const mockStream = {
+                    end: (buffer) => {
+                        callback(null, { secure_url: 'https://test-cloudinary.com/test-image.jpg' });
+                    }
+                };
+                return mockStream;
+            }),
+            destroy: jest.fn().mockResolvedValue({ result: 'ok' })
+        },
+        config: jest.fn()
+    }
+}), { virtual: true });
+
 process.env.NODE_ENV = 'test';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });

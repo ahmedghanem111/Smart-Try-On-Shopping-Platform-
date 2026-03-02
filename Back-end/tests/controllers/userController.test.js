@@ -46,9 +46,11 @@ describe('User Controller', () => {
                 .post('/api/users')
                 .send({
                     email: 'test@example.com'
+                    // Missing name and password
                 });
 
-            expect(res.statusCode).toBe(500);
+            expect(res.statusCode).toBe(400);
+            expect(res.body.message).toBe('Please add a name');
         });
     });
 
@@ -82,9 +84,6 @@ describe('User Controller', () => {
                 });
 
             expect(res.statusCode).toBe(401);
-            // Your API might not return a message
-            console.log('Login error response:', res.body);
-            // Just check that status is 401
         });
 
         it('should not login with non-existent email', async () => {
@@ -96,8 +95,6 @@ describe('User Controller', () => {
                 });
 
             expect(res.statusCode).toBe(401);
-            console.log('Non-existent email response:', res.body);
-            // Just check that status is 401
         });
     });
 

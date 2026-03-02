@@ -33,16 +33,35 @@ const getProductById = asyncHandler(async (req, res) => {
 
 const deleteProduct = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id);
-    if (product) {
-        if (product.image) {
-            const publicId = product.image.split('/').pop().split('.')[0];
-            await cloudinary.uploader.destroy(`Fitme/products/${publicId}`);
-        }
-        await product.deleteOne();
-        res.json({ message: 'Product removed and cloud storage cleaned' });
-    } else {
+
+    if (!product) {
         res.status(404);
         throw new Error('Product not found');
+    }
+
+    try {
+        if (product.image) {
+            try {
+                const publicId = product.image.split('/').pop().split('.')[0];
+                await cloudinary.uploader.destroy(`Fitme/products/${publicId}`);
+                console.log('Cloudinary image deleted successfully');
+            } catch (cloudinaryError) {
+                console.error('Cloudinary deletion error:', cloudinaryError.message);
+            }
+        }
+
+        await product.deleteOne();
+
+        res.json({
+            message: product.image
+                ? 'Product removed and cloud storage cleaned'
+                : 'Product removed successfully'
+        });
+
+    } catch (error) {
+        console.error('Product deletion error:', error);
+        res.status(500);
+        throw new Error('Failed to delete product');
     }
 });
 

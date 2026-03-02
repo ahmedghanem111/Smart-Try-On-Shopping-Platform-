@@ -279,7 +279,7 @@ describe('Product Controller', () => {
                 .set('Authorization', `Bearer ${adminToken}`);
 
             expect(res.statusCode).toBe(200);
-            expect(res.body.message).toBe('Product removed');
+            expect(res.body.message).toBe('Product removed and cloud storage cleaned');
 
             const deletedProduct = await Product.findById(productId);
             expect(deletedProduct).toBeNull();

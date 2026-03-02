@@ -16,8 +16,24 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const morgan = require('morgan');
 
+console.log('🔍 Debug: Starting server initialization');
+console.log('Current directory:', process.cwd());
+console.log('__dirname:', __dirname);
+console.log('MONGO_URI exists:', !!process.env.MONGO_URI);
+console.log('MONGO_URI first chars:', process.env.MONGO_URI ? process.env.MONGO_URI.substring(0, 20) + '...' : 'not set');
+
+let dbConnected = false;
+
 if (process.env.NODE_ENV !== 'test') {
-    connectDB();
+    connectDB()
+        .then(() => {
+            dbConnected = true;
+            console.log('✅ Database connected successfully');
+        })
+        .catch(err => {
+            console.error('❌ Database connection failed:', err);
+            dbConnected = false;
+        });
 }
 
 const app = express();
@@ -26,16 +42,32 @@ app.use(express.json());
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
+
 app.use(cors({
     origin: process.env.NODE_ENV === 'production'
-        ? 'https://live-app.com'
+        ? [process.env.FRONTEND_URL || 'https://frontend.vercel.app'].filter(Boolean)
         : 'http://localhost:3000',
     credentials: true
 }));
 
 app.get('/', (req, res) => {
-    res.send('Fitme API is running...');
+    res.json({
+        message: 'Fitme API is running...',
+        database: dbConnected ? 'connected' : 'disconnected',
+        environment: process.env.NODE_ENV
+    });
 });
+
+app.get('/api/health', (req, res) => {
+    res.status(200).json({
+        status: 'OK',
+        message: 'Server is running',
+        database: dbConnected ? 'connected' : 'disconnected',
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
+    });
+});
+
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);
@@ -56,11 +88,10 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-if (process.env.NODE_ENV !== 'test') {
-    app.listen(
-        PORT,
-        () => console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.yellow.bold)
-    );
+if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, () => {
+        console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.yellow.bold);
+    });
 }
 
 module.exports = app;
