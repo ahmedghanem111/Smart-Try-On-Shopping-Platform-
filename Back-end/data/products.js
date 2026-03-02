@@ -3,6 +3,7 @@ const products = [
     {
         name: 'Classic White Tee',
         image: '/images/white-tee.jpg',
+        model3d: 'https://res.cloudinary.com/demo/image/upload/v1/Fitme/white-tee.glb',
         description: 'Essential cotton t-shirt. Perfect for AI upper-body mapping.',
         brand: 'GradBrand',
         category: 'Clothes',
@@ -15,6 +16,7 @@ const products = [
     {
         name: 'Slim Fit Denim Jeans',
         image: '/images/jeans.jpg',
+        model3d: 'https://res.cloudinary.com/demo/image/upload/v1/Fitme/jeans.glb',
         description: 'Dark blue denim with a modern cut.',
         brand: 'Levis',
         category: 'Clothes',
@@ -23,12 +25,40 @@ const products = [
         countInStock: 10,
         rating: 4.0,
         numReviews: 8,
+
+    },
+    {
+        name: 'Tech-Fleece Urban Hoodie',
+        image: '/images/hoodie-black.webp',
+        model3d: 'https://res.cloudinary.com/demo/image/upload/v1/Fitme/hoodie.glb',
+        description: 'High-performance tech fleece for everyday comfort and style.',
+        brand: 'Fitme',
+        category: 'Clothes',
+        subCategory: 'Top',
+        price: 89.99,
+        countInStock: 10,
+        rating: 4.5,
+        numReviews: 12,
+    },
+    {
+        name: 'Essential White Tee',
+        image: '/images/tee-white.webp',
+        model3d: 'https://res.cloudinary.com/demo/image/upload/v1/Fitme/shirt.glb',
+        description: '100% organic cotton, perfect for layering or solo wear.',
+        brand: 'Fitme',
+        category: 'Clothes',
+        subCategory: 'Top',
+        price: 29.99,
+        countInStock: 7,
+        rating: 4.0,
+        numReviews: 8,
     },
 
     // --- FOOTWEAR ---
     {
         name: 'Air Running Sneakers',
         image: '/images/sneakers.jpg',
+        model3d: 'https://res.cloudinary.com/demo/image/upload/v1/Fitme/sneakers.glb',
         description: 'Lightweight running shoes with high arch support.',
         brand: 'Nike',
         category: 'Footwear',
@@ -37,11 +67,24 @@ const products = [
         rating: 5,
         numReviews: 12,
     },
+    {
+        name: 'Gucci shoes',
+        image: '/images/gucci-shoes.jpg',
+        model3d: 'https://res.cloudinary.com/demo/image/upload/v1/Fitme/gucci-shoes.glb',
+        description: 'Elegant multicolor leather sneakers.',
+        brand: 'Gucci',
+        category: 'Footwear',
+        price: 189.99,
+        countInStock: 8,
+        rating: 5,
+        numReviews: 15,
+    },
 
     // --- BAGS ---
     {
         name: 'Leather CrossBody Bag',
         image: '/images/bag.jpg',
+        model3d: 'https://res.cloudinary.com/demo/image/upload/v1/Fitme/bag.glb',
         description: 'Genuine leather bag with adjustable strap.',
         brand: 'Coach',
         category: 'Bags',
@@ -55,6 +98,7 @@ const products = [
     {
         name: 'Classic Silver Chronograph',
         image: '/images/watch.jpg',
+        model3d: 'https://res.cloudinary.com/demo/image/upload/v1/Fitme/watch.glb',
         description: 'Water-resistant silver watch with quartz movement.',
         brand: 'Fossil',
         category: 'Watches',
@@ -68,6 +112,7 @@ const products = [
     {
         name: 'Gold Plated Necklace',
         image: '/images/necklace.jpg',
+        model3d: 'https://res.cloudinary.com/demo/image/upload/v1/Fitme/necklace.glb',
         description: 'Minimalist gold chain, perfect for layering.',
         brand: 'Pandora',
         category: 'Jewellery',
@@ -81,6 +126,7 @@ const products = [
     {
         name: 'Winter Wool Scarf',
         image: '/images/scarf.jpg',
+        model3d: 'https://res.cloudinary.com/demo/image/upload/v1/Fitme/scarf.glb',
         description: 'Warm and cozy wool scarf in checkered pattern.',
         brand: 'Burberry',
         category: 'Scarves',

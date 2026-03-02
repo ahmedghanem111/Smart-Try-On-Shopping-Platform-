@@ -34,8 +34,12 @@ const getProductById = asyncHandler(async (req, res) => {
 const deleteProduct = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id);
     if (product) {
+        if (product.image) {
+            const publicId = product.image.split('/').pop().split('.')[0];
+            await cloudinary.uploader.destroy(`Fitme/products/${publicId}`);
+        }
         await product.deleteOne();
-        res.json({ message: 'Product removed' });
+        res.json({ message: 'Product removed and cloud storage cleaned' });
     } else {
         res.status(404);
         throw new Error('Product not found');

@@ -1,6 +1,8 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
@@ -27,11 +29,27 @@ const authUser = asyncHandler(async (req, res) => {
 const registerUser = asyncHandler(async (req, res) => {
     const { name, email, password } = req.body;
 
+    if (!name || name.trim().length === 0) {
+        res.status(400);
+        throw new Error('Please add a name');
+    }
+
+    const emailRegex = /^\S+@\S+\.\S+$/;
+    if (!email || !emailRegex.test(email)) {
+        res.status(400);
+        throw new Error('Please add a valid email address');
+    }
+
+    if (!password || password.length < 8) {
+        res.status(400);
+        throw new Error('Password must be at least 8 characters long');
+    }
+
     const userExists = await User.findOne({ email });
 
     if (userExists) {
-        res.status(400).send('User already exists');
-        return;
+        res.status(400);
+        throw new Error('User already exists');
     }
 
     const user = await User.create({
@@ -49,7 +67,48 @@ const registerUser = asyncHandler(async (req, res) => {
             token: generateToken(user._id),
         });
     } else {
-        res.status(400).send('Invalid user data');
+        res.status(400);
+        throw new Error('Invalid user data');
+    }
+});
+
+const authGoogleUser = asyncHandler(async (req, res) => {
+    const { idToken } = req.body;
+
+    try {
+        const ticket = await client.verifyIdToken({
+            idToken,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+
+        const { name, email, sub: googleId } = ticket.getPayload();
+
+        let user = await User.findOne({ email });
+
+        if (user) {
+            if (!user.googleId) {
+                user.googleId = googleId;
+                await user.save();
+            }
+        } else {
+            user = await User.create({
+                name,
+                email,
+                googleId,
+                password: Math.random().toString(36).slice(-10),
+                isAdmin: false,
+            });
+        }
+
+        res.json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            isAdmin: user.isAdmin,
+            token: generateToken(user._id),
+        });
+    } catch (error) {
+        res.status(401).json({ message: 'Google authentication failed' });
     }
 });
 
@@ -122,4 +181,4 @@ const deleteUserProfile = asyncHandler(async (req, res) => {
     }
 });
 
-module.exports = { authUser, registerUser, getUserProfile, updateUserProfile, getUsers, deleteUser, deleteUserProfile };
+module.exports = { authUser, registerUser, getUserProfile, updateUserProfile, getUsers, deleteUser, deleteUserProfile, authGoogleUser };

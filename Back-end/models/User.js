@@ -2,9 +2,10 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = mongoose.Schema({
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
+    name: { type: String, required: [true, 'Please add a name'] },
+    email: { type: String, required: [true, 'Please add an email'], unique: true, match: [/^\S+@\S+\.\S+$/, 'Please add a valid email'] },
+    password: { type: String, required: [true, 'Please add a password'], minlength: [8, 'Password must be at least 8 characters'] },
+    googleId: {type: String, unique: true, sparse: true,},
     isAdmin: { type: Boolean, default: false, required: true },
 
     avatarImage: {

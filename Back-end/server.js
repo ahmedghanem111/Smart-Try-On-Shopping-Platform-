@@ -14,6 +14,7 @@ const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
+const morgan = require('morgan');
 
 if (process.env.NODE_ENV !== 'test') {
     connectDB();
@@ -22,13 +23,19 @@ if (process.env.NODE_ENV !== 'test') {
 const app = express();
 
 app.use(express.json());
+if (process.env.NODE_ENV === 'development') {
+    app.use(morgan('dev'));
+}
 app.use(cors({
     origin: process.env.NODE_ENV === 'production'
         ? 'https://live-app.com'
-        : 'http://localhost:5000',
+        : 'http://localhost:3000',
     credentials: true
 }));
 
+app.get('/', (req, res) => {
+    res.send('Fitme API is running...');
+});
 app.use('/api/products', productRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/upload', uploadRoutes);

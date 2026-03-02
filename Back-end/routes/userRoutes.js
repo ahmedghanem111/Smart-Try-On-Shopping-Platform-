@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authUser, registerUser, getUserProfile, updateUserProfile, getUsers, deleteUser, deleteUserProfile } = require('../controllers/userController');
+const { authUser, registerUser, getUserProfile, updateUserProfile, getUsers, deleteUser, deleteUserProfile, authGoogleUser } = require('../controllers/userController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
 /**
@@ -25,6 +25,23 @@ const { protect, admin } = require('../middleware/authMiddleware');
  *   post:
  *     summary: Login user
  *     tags: [Users]
+ *     responses:
+ *       200:
+ *         description: Success
+ *
+ * /api/users/google:
+ *   post:
+ *     summary: Google Authentication
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               idToken:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Success
@@ -59,5 +76,6 @@ router.route('/').post(registerUser).get(protect, admin, getUsers);
 router.post('/login', authUser);
 router.route('/profile').get(protect, getUserProfile).put(protect, updateUserProfile).delete(protect, deleteUserProfile);
 router.route('/:id').delete(protect, admin, deleteUser);
+router.post('/google', authGoogleUser);
 
 module.exports = router;

@@ -5,6 +5,7 @@ const users = require('./data/users');
 const products = require('./data/products');
 const User = require('./models/User');
 const Product = require('./models/Product');
+const Order = require('./models/Order');
 const connectDB = require('./config/db');
 
 dotenv.config();
@@ -13,8 +14,10 @@ connectDB();
 
 const importData = async () => {
     try {
+        await Order.deleteMany();
         await Product.deleteMany();
         await User.deleteMany();
+
         const createdUsers = await User.create(users);
         const adminUser = createdUsers[0]._id;
         const sampleProducts = products.map((product) => {
@@ -33,6 +36,7 @@ const importData = async () => {
 
 const destroyData = async () => {
     try {
+        Order.deleteMany();
         await Product.deleteMany();
         await User.deleteMany();
 
