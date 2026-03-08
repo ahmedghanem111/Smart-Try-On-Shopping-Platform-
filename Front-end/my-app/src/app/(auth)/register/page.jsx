@@ -3,75 +3,53 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { useFormik } from 'formik'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { registerRequest } from '@/services/authService'
+import { useToast } from '@/contexts/ToastContext'
+import { registerSchema } from '@/lib/validationSchemas'
+import GoogleLoginButton from '@/components/ui/GoogleLoginButton'
 
 const Register = () => {
   const { login } = useAuth()
   const router = useRouter()
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const { toast } = useToast()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-    setError('')
-  }
+  const formik = useFormik({
+    initialValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+    validationSchema: registerSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      try {
+        const response = await registerRequest({
+          name: values.name,
+          email: values.email,
+          password: values.password
+        })
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-      setError('Please fill in all fields.')
-      setLoading(false)
-      return
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match.')
-      setLoading(false)
-      return
-    }
-
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters.')
-      setLoading(false)
-      return
-    }
-
-    try {
-
-      const response = await registerRequest({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password
-      })
-      // console.log(response)
-
-      login(response.data)
-      
-      if (response.data.isAdmin) {
-        router.push('/dashboard')
-      } else {
-        router.push('/')
+        login(response.data)
+        toast.success('Account created successfully! Welcome aboard.')
+        
+        if (response.data.isAdmin) {
+          router.push('/dashboard')
+        } else {
+          router.push('/')
+        }
+      } catch (err) {
+        const errorMessage = err.response?.data?.message || err.response?.data || 'Registration failed. Please try again.'
+        toast.error(errorMessage)
+      } finally {
+        setSubmitting(false)
       }
-    } catch (err) {
-      const errorMessage = err.response?.data || 'Registration failed. Please try again.'
-      setError(errorMessage)
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+  })
 
   const getStrength = (password) => {
     if (!password) return { level: 0, label: '', color: '' }
@@ -86,7 +64,7 @@ const Register = () => {
     return { level: 3, label: 'Strong', color: 'bg-green-500' }
   }
 
-  const strength = getStrength(formData.password)
+  const strength = getStrength(formik.values.password)
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -149,20 +127,7 @@ const Register = () => {
               <p className="text-slate-500 dark:text-slate-400 text-sm">Start your AI-powered fashion journey in seconds</p>
             </motion.div>
 
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {error}
-              </motion.div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={formik.handleSubmit} className="space-y-5">
 
               <motion.div variants={itemVariants} className="space-y-2">
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Full Name</label>
@@ -175,12 +140,25 @@ const Register = () => {
                   <input
                     type="text"
                     name="name"
-                    value={formData.name}
-                    onChange={handleChange}
+                    value={formik.values.name}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                     placeholder="John Doe"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:focus:border-purple-500 transition-all duration-200"
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
+                      formik.touched.name && formik.errors.name
+                        ? 'border-red-400 dark:border-red-600'
+                        : 'border-slate-200 dark:border-slate-700'
+                    } text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:focus:border-purple-500 transition-all duration-200`}
                   />
                 </div>
+                {formik.touched.name && formik.errors.name && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {formik.errors.name}
+                  </p>
+                )}
               </motion.div>
 
 
@@ -195,12 +173,25 @@ const Register = () => {
                   <input
                     type="email"
                     name="email"
-                    value={formData.email}
-                    onChange={handleChange}
+                    value={formik.values.email}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                     placeholder="you@example.com"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:focus:border-purple-500 transition-all duration-200"
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
+                      formik.touched.email && formik.errors.email
+                        ? 'border-red-400 dark:border-red-600'
+                        : 'border-slate-200 dark:border-slate-700'
+                    } text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:focus:border-purple-500 transition-all duration-200`}
                   />
                 </div>
+                {formik.touched.email && formik.errors.email && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {formik.errors.email}
+                  </p>
+                )}
               </motion.div>
 
               <motion.div variants={itemVariants} className="space-y-2">
@@ -214,10 +205,15 @@ const Register = () => {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
-                    value={formData.password}
-                    onChange={handleChange}
+                    value={formik.values.password}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-12 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:focus:border-purple-500 transition-all duration-200"
+                    className={`w-full pl-10 pr-12 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
+                      formik.touched.password && formik.errors.password
+                        ? 'border-red-400 dark:border-red-600'
+                        : 'border-slate-200 dark:border-slate-700'
+                    } text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:focus:border-purple-500 transition-all duration-200`}
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
                     {showPassword ? (
@@ -233,7 +229,7 @@ const Register = () => {
                   </button>
                 </div>
 
-                {formData.password && (
+                {formik.values.password && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -254,6 +250,14 @@ const Register = () => {
                     </p>
                   </motion.div>
                 )}
+                {formik.touched.password && formik.errors.password && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {formik.errors.password}
+                  </p>
+                )}
               </motion.div>
 
               <motion.div variants={itemVariants} className="space-y-2">
@@ -267,13 +271,14 @@ const Register = () => {
                   <input
                     type={showConfirm ? 'text' : 'password'}
                     name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
+                    value={formik.values.confirmPassword}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                     placeholder="••••••••"
                     className={`w-full pl-10 pr-12 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 ${
-                      formData.confirmPassword && formData.password !== formData.confirmPassword
+                      formik.touched.confirmPassword && formik.errors.confirmPassword
                         ? 'border-red-400 dark:border-red-600 focus:border-red-500'
-                        : formData.confirmPassword && formData.password === formData.confirmPassword
+                        : formik.values.confirmPassword && formik.values.password === formik.values.confirmPassword
                         ? 'border-green-400 dark:border-green-600 focus:border-green-500'
                         : 'border-slate-200 dark:border-slate-700 focus:border-purple-500 dark:focus:border-purple-500'
                     }`}
@@ -290,10 +295,9 @@ const Register = () => {
                       </svg>
                     )}
                   </button>
-                  {/* Match indicator */}
-                  {formData.confirmPassword && (
+                  {formik.values.confirmPassword && (
                     <div className="absolute inset-y-0 right-10 flex items-center pr-1">
-                      {formData.password === formData.confirmPassword ? (
+                      {formik.values.password === formik.values.confirmPassword ? (
                         <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                         </svg>
@@ -305,19 +309,27 @@ const Register = () => {
                     </div>
                   )}
                 </div>
+                {formik.touched.confirmPassword && formik.errors.confirmPassword && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {formik.errors.confirmPassword}
+                  </p>
+                )}
               </motion.div>
 
               {/* Submit Button */}
               <motion.div variants={itemVariants} className="pt-2">
                 <motion.button
                   type="submit"
-                  disabled={loading}
+                  disabled={formik.isSubmitting}
                   className="group relative w-full px-8 py-3.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold shadow-lg shadow-purple-500/30 dark:shadow-purple-500/20 overflow-hidden disabled:opacity-70 disabled:cursor-not-allowed"
-                  whileHover={!loading ? { scale: 1.02, y: -1 } : {}}
-                  whileTap={!loading ? { scale: 0.98 } : {}}
+                  whileHover={!formik.isSubmitting ? { scale: 1.02, y: -1 } : {}}
+                  whileTap={!formik.isSubmitting ? { scale: 0.98 } : {}}
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
-                    {loading ? (
+                    {formik.isSubmitting ? (
                       <>
                         <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -345,13 +357,28 @@ const Register = () => {
                 <div className="w-full border-t border-slate-200 dark:border-slate-700" />
               </div>
               <div className="relative flex justify-center text-xs">
+                <span className="px-3 bg-white dark:bg-slate-900 text-slate-400">Or continue with</span>
+              </div>
+            </motion.div>
+
+            {/* Google Login */}
+            <motion.div variants={itemVariants} className="mb-6">
+              <GoogleLoginButton />
+            </motion.div>
+
+            {/* Divider */}
+            <motion.div variants={itemVariants} className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200 dark:border-slate-700" />
+              </div>
+              <div className="relative flex justify-center text-xs">
                 <span className="px-3 bg-white dark:bg-slate-900 text-slate-400">Already have an account?</span>
               </div>
             </motion.div>
 
             {/* Login Link */}
             <motion.div variants={itemVariants}>
-              <Link href="/auth/login">
+              <Link href="/login">
                 <motion.button
                   className="w-full px-8 py-3.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl font-semibold border-2 border-slate-200 dark:border-slate-700 hover:border-purple-400 dark:hover:border-purple-500 transition-all duration-300 shadow-sm"
                   whileHover={{ scale: 1.02, y: -1 }}

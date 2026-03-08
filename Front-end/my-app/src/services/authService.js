@@ -8,3 +8,7 @@ export const loginRequest = (data) => {
 export const registerRequest = (data) => {
    return API.post("/api/users", data);
 };
+
+export const googleLoginRequest = (idToken) => {
+   return API.post("/api/users/google", { idToken });
+};

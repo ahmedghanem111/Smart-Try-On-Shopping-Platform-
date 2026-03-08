@@ -3,53 +3,46 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { useFormik } from 'formik'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { loginRequest } from '@/services/authService'
+import { useToast } from '@/contexts/ToastContext'
+import { loginSchema } from '@/lib/validationSchemas'
+import GoogleLoginButton from '@/components/ui/GoogleLoginButton'
 
 const Login = () => {
   const { login } = useAuth()
   const router = useRouter()
-  const [formData, setFormData] = useState({ email: '', password: '' })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const { toast } = useToast()
   const [showPassword, setShowPassword] = useState(false)
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
-    setError('')
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    try {
-
-      if (!formData.email || !formData.password) {
-        setError('Please fill in all fields.')
-        setLoading(false)
-        return
+  const formik = useFormik({
+    initialValues: {
+      email: '',
+      password: '',
+    },
+    validationSchema: loginSchema,
+    onSubmit: async (values, { setSubmitting }) => {
+      try {
+        const response = await loginRequest(values)
+        
+        login(response.data)
+        toast.success('Login successful! Welcome back.')
+        
+        if (response.data.isAdmin) {
+          router.push('/dashboard')
+        } else {
+          router.push('/')
+        }
+      } catch (err) {
+        const errorMessage = err.response?.data?.message || err.response?.data || 'Invalid email or password. Please try again.'
+        toast.error(errorMessage)
+      } finally {
+        setSubmitting(false)
       }
-
-      const response = await loginRequest(formData)
-      // console.log(response)
-      
-      login(response.data)
-      
-      if (response.data.isAdmin) {
-        router.push('/dashboard')
-      } else {
-        router.push('/')
-      }
-    } catch (err) {
-      const errorMessage = err.response?.data || 'Invalid email or password. Please try again.'
-      setError(errorMessage)
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+  })
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -115,22 +108,8 @@ const Login = () => {
               <p className="text-slate-500 dark:text-slate-400 text-sm">Enter your credentials to continue your AI shopping journey</p>
             </motion.div>
 
-            {/* Error Message */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
-              >
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {error}
-              </motion.div>
-            )}
-
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={formik.handleSubmit} className="space-y-5">
 
               {/* Email */}
               <motion.div variants={itemVariants} className="space-y-2">
@@ -144,12 +123,25 @@ const Login = () => {
                   <input
                     type="email"
                     name="email"
-                    value={formData.email}
-                    onChange={handleChange}
+                    value={formik.values.email}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                     placeholder="you@example.com"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:focus:border-purple-500 transition-all duration-200"
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
+                      formik.touched.email && formik.errors.email
+                        ? 'border-red-400 dark:border-red-600'
+                        : 'border-slate-200 dark:border-slate-700'
+                    } text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:focus:border-purple-500 transition-all duration-200`}
                   />
                 </div>
+                {formik.touched.email && formik.errors.email && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {formik.errors.email}
+                  </p>
+                )}
               </motion.div>
 
               {/* Password */}
@@ -169,10 +161,15 @@ const Login = () => {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
-                    value={formData.password}
-                    onChange={handleChange}
+                    value={formik.values.password}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-12 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:focus:border-purple-500 transition-all duration-200"
+                    className={`w-full pl-10 pr-12 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
+                      formik.touched.password && formik.errors.password
+                        ? 'border-red-400 dark:border-red-600'
+                        : 'border-slate-200 dark:border-slate-700'
+                    } text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:focus:border-purple-500 transition-all duration-200`}
                   />
                   <button
                     type="button"
@@ -191,19 +188,27 @@ const Login = () => {
                     )}
                   </button>
                 </div>
+                {formik.touched.password && formik.errors.password && (
+                  <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {formik.errors.password}
+                  </p>
+                )}
               </motion.div>
 
               {/* Submit Button */}
               <motion.div variants={itemVariants} className="pt-2">
                 <motion.button
                   type="submit"
-                  disabled={loading}
+                  disabled={formik.isSubmitting}
                   className="group relative w-full px-8 py-3.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold shadow-lg shadow-purple-500/30 dark:shadow-purple-500/20 overflow-hidden disabled:opacity-70 disabled:cursor-not-allowed"
-                  whileHover={!loading ? { scale: 1.02, y: -1 } : {}}
-                  whileTap={!loading ? { scale: 0.98 } : {}}
+                  whileHover={!formik.isSubmitting ? { scale: 1.02, y: -1 } : {}}
+                  whileTap={!formik.isSubmitting ? { scale: 0.98 } : {}}
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
-                    {loading ? (
+                    {formik.isSubmitting ? (
                       <>
                         <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -224,6 +229,21 @@ const Login = () => {
                 </motion.button>
               </motion.div>
             </form>
+
+            {/* Divider */}
+            <motion.div variants={itemVariants} className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200 dark:border-slate-700" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-3 bg-white dark:bg-slate-900 text-slate-400">Or continue with</span>
+              </div>
+            </motion.div>
+
+            {/* Google Login */}
+            <motion.div variants={itemVariants} className="mb-6">
+              <GoogleLoginButton />
+            </motion.div>
 
             {/* Divider */}
             <motion.div variants={itemVariants} className="relative my-6">
