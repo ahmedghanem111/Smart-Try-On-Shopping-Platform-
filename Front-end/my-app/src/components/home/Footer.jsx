@@ -11,7 +11,7 @@ transition-all duration-300
 `;
 const Footer = () => {
   return (
-    <footer className="bg-white/80 dark:bg-black/60 backdrop-blur-md border-b border-purple-400 border-t mt-20">
+    <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700">
       <div className="max-w-7xl mx-auto px-6 py-16">
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 items-start">
@@ -65,12 +65,12 @@ const Footer = () => {
 
         </div>
 
-        {/* Divider */}
-        <div className="border-t border-gray-200 dark:border-slate-800 mt-12 pt-6 text-center">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            © 2026 Fitme. All rights reserved. Built with cutting-edge AI technology.
-          </p>
-        </div>
+          {/* Divider */}
+          <div className="border-t border-slate-200 dark:border-slate-700 mt-12 pt-6 text-center">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              © 2026 Fitme. All rights reserved. Built with cutting-edge AI technology.
+            </p>
+          </div>
 
       </div>
     </footer>

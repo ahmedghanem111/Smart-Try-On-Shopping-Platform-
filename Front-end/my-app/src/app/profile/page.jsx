@@ -20,13 +20,13 @@ const ProfilePage = () => {
   }
 
   return (
-    <section className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50/20 dark:from-slate-950 dark:via-purple-950/20 dark:to-blue-950/10 py-16 px-4">
+    <section className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/30 to-blue-50/20 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 py-16 px-4">
       <div className="max-w-4xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8"
+          className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-8"
         >
           {/* Header */}
           <div className="text-center mb-8">

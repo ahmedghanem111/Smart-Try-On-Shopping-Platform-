@@ -1,31 +1,18 @@
 @import "tailwindcss";
 
-/* Root colors */
-html.light {
-  color: var(--text-light);
-}
-
-html.dark {
-  color: var(--text-dark);
-}
+@variant dark (&:is(.dark, .dark *));
 
 body {
   min-height: 100vh;
-  background-color: var(--bg-light);
-  color: var(--text-light);
+  background-color: #ffffff;
+  color: #0f172a;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 html.dark body {
-  background: radial-gradient(
-    circle at top,
-    #020617,
-    #000000
-  );
-  color: var(--text-dark);
+  background-color: #0f172a;
+  color: #f1f5f9;
 }
-
-
 
 ::-webkit-scrollbar {
   width: 8px;
@@ -36,10 +23,10 @@ html.dark body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #94a3b8; /* slate-400 */
+  background-color: #94a3b8;
   border-radius: 6px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background-color: #475569; /* slate-600 */
+html.dark ::-webkit-scrollbar-thumb {
+  background-color: #475569;
 }
