@@ -18,6 +18,9 @@ const authUser = asyncHandler(async (req, res) => {
             _id: user._id,
             name: user.name,
             email: user.email,
+            gender: user.gender,
+            height: user.height,
+            weight: user.weight,
             isAdmin: user.isAdmin,
             token: generateToken(user._id),
         });
@@ -104,6 +107,9 @@ const authGoogleUser = asyncHandler(async (req, res) => {
             _id: user._id,
             name: user.name,
             email: user.email,
+            gender: user.gender,
+            height: user.height,
+            weight: user.weight,
             isAdmin: user.isAdmin,
             token: generateToken(user._id),
         });
@@ -120,6 +126,9 @@ const getUserProfile = asyncHandler(async (req, res) => {
             _id: user._id,
             name: user.name,
             email: user.email,
+            gender: user.gender,
+            height: user.height,
+            weight: user.weight,
             isAdmin: user.isAdmin,
         });
     } else {
@@ -133,6 +142,10 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     if (user) {
         user.name = req.body.name || user.name;
         user.email = req.body.email || user.email;
+        user.gender = req.body.gender || user.gender;
+        user.height = req.body.height || user.height;
+        user.weight = req.body.weight || user.weight;
+
         if (req.body.password) {
             user.password = req.body.password;
         }
@@ -143,6 +156,9 @@ const updateUserProfile = asyncHandler(async (req, res) => {
             _id: updatedUser._id,
             name: updatedUser.name,
             email: updatedUser.email,
+            gender: updatedUser.gender,
+            height: updatedUser.height,
+            weight: updatedUser.weight,
             isAdmin: updatedUser.isAdmin,
             token: generateToken(updatedUser._id),
         });

@@ -11,8 +11,12 @@ const options = {
         servers: [
             {
                 url: 'http://localhost:5000',
-                description: 'Development server',
+                description: 'Development server'
             },
+            {
+                url: 'smart-try-on-shopping-platform-production.up.railway.app',
+                description: 'Production server'
+            }
         ],
         components: {
             securitySchemes: {
