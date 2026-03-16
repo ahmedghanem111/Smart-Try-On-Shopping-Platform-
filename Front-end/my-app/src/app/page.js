@@ -4,6 +4,7 @@ import Footer from "../components/home/Footer";
 import Herosection from "../components/home/Herosection";
 import Features from "../components/home/Features";
 import WhoUsesOurAI from "../components/home/WhoUsesOurAI";
+import CTASection from "../components/home/CTASection";
 
 export default function Home() {
   return (
@@ -12,6 +13,7 @@ export default function Home() {
         <Herosection />
         <Features/>
         <WhoUsesOurAI />
+        <CTASection />
       </main>
       <Footer/>
     </>

@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
-import { motion } from 'framer-motion'
+import React, { useRef, useEffect, useState } from 'react'
+import { motion, useScroll, useTransform } from 'framer-motion'
 import Image from 'next/image'
 
 const features = [
@@ -15,7 +15,7 @@ const features = [
       'Enter height and weight measurements',
       'Generate a digital body profile for accurate try-on'
     ],
-    image: '/f1.jpeg',
+    image: '/b1.png',
   },
   {
     id: 2,
@@ -39,7 +39,7 @@ const features = [
       'Zoom in to inspect fabric details',
       'Realistic visualization beyond static photos'
     ],
-    image: '/f3.jpeg',
+    image: '/f3.png',
   },
   {
     id: 4,
@@ -51,66 +51,75 @@ const features = [
       'Minimize product returns',
       'Shop with greater confidence'
     ],
-    image: '/f4.jpeg',
+    image: '/f4.png',
   }
 ]
 
-const FeatureCard = ({ feature, index }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 40 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.12 }}
-    viewport={{ once: true }}
-    whileHover={{ y: -10 }}
-    className="group bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl overflow-hidden flex flex-col 
-    shadow-sm hover:shadow-2xl transition-all duration-300"
-  >
-    <div className="relative h-64 w-full bg-gray-100 dark:bg-slate-700 overflow-hidden">
-      <Image
-        src={feature.image}
-        alt={feature.title}
-        fill
-        className="object-cover group-hover:scale-105 transition-transform duration-700"
-      />
+const StackedCard = ({ feature, index, totalCards }) => {
+  const cardRef = useRef(null)
+  const { scrollYProgress } = useScroll({
+    target: cardRef,
+    offset: ["start end", "start start"]
+  })
 
-      <div className="absolute top-4 left-4">
-        <span className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-md px-3 py-1 text-[10px] uppercase tracking-[0.3em] font-semibold text-black dark:text-white border border-gray-200 dark:border-slate-600 rounded-full">
-          {feature.category}
-        </span>
-      </div>
-    </div>
+  const scale = useTransform(scrollYProgress, [0, 1], [0.8, 1])
+  
 
-    <div className="p-10 flex flex-col flex-1">
-
-      <h3 className="text-2xl md:text-3xl font-serif text-slate-900 dark:text-white mb-4 leading-snug">
-        {feature.title}
-      </h3>
-
-      <p className="text-slate-500 dark:text-slate-400 text-sm md:text-xl leading-relaxed mb-6">
-        {feature.description}
-      </p>
-
-      <div className="space-y-3 mt-auto">
-        {feature.points.map((point, i) => (
-          <div key={i} className="flex items-start gap-3">
-            <div className="mt-[7px] w-2 h-2 rounded-full bg-slate-900 dark:bg-slate-300" />
-            <span className="text-l text-slate-600 dark:text-slate-400 leading-relaxed">
-              {point}
+  return (
+    <motion.div
+      ref={cardRef}
+      style={{
+        scale,
+        top: `${index * 80}px`,
+      }}
+      className="sticky  top-24 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-sm"
+    >
+      <div className="grid md:grid-cols-2 gap-0">
+        <div className="relative h-[400px] md:h-full bg-gray-100 dark:bg-slate-700 overflow-hidden">
+          <Image
+            src={feature.image}
+            alt={feature.title}
+            fill
+            className="object-cover"
+          />
+          <div className="absolute top-6 left-6">
+            <span className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md px-4 py-2 text-[10px] uppercase tracking-[0.3em] font-semibold text-black dark:text-white border border-gray-200 dark:border-slate-600 rounded-full">
+              {feature.category}
             </span>
           </div>
-        ))}
-      </div>
+        </div>
 
-    </div>
-  </motion.div>
-)
+        <div className="p-8 md:p-12 flex flex-col justify-center">
+          <h3 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-6 leading-tight">
+            {feature.title}
+          </h3>
+
+          <p className="text-slate-700 dark:text-slate-300 text-lg leading-relaxed mb-8">
+            {feature.description}
+          </p>
+
+          <div className="space-y-4">
+            {feature.points.map((point, i) => (
+              <div key={i} className="flex items-start gap-3">
+                <div className="mt-[7px] w-2 h-2 rounded-full bg-slate-900 dark:bg-slate-300 flex-shrink-0" />
+                <span className="text-base text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {point}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
 
 const Features = () => {
   return (
-    <section className="bg-[#fcfcfc] dark:bg-slate-900 py-32 px-6">
-      <div className="max-w-7xl mx-auto">
+    <section className="bg-gray-100 dark:bg-slate-900 py-32 px-6">
+      <div className="max-w-6xl mx-auto">
         
-        <div className="text-center mb-28 space-y-4">
+        <div className="text-center mb-20 space-y-4">
           <motion.span 
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -118,19 +127,23 @@ const Features = () => {
           >
             Capabilities
           </motion.span>
-       <motion.h2
-  initial={{ opacity: 0, y: 10 }}
-  whileInView={{ opacity: 1, y: 0 }}
-  className="text-5xl md:text-6xl font-serif text-slate-900 dark:text-white leading-tight"
->
-
+          <motion.h2
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            className="text-5xl md:text-6xl font-serif text-slate-900 dark:text-white leading-tight"
+          >
             Redefining the <span className="italic underline underline-offset-8 decoration-gray-100 dark:decoration-slate-700">Fashion Landscape</span>
           </motion.h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10">
+        <div className="space-y-32">
           {features.map((feature, index) => (
-            <FeatureCard key={feature.id} feature={feature} index={index} />
+            <StackedCard 
+              key={feature.id} 
+              feature={feature} 
+              index={index}
+              totalCards={features.length}
+            />
           ))}
         </div>
       </div>

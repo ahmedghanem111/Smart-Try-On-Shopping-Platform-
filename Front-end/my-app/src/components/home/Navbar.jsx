@@ -15,12 +15,14 @@ const Navbar = () => {
     { id: 'home', label: 'Home', href: '/' },
     { id: 'products', label: 'Products', href: '/product' },
     { id: 'try-on', label: 'Find My Fit', href: '/try-on' },
+    { id: 'brands', label: 'Brands', href: '/brand' },
+    { id: 'contact', label: 'Contact', href: '/contact' },
   ];
 
   return (
     <nav className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 font-serif">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-18">
 
       
           <Link href="/" className="flex items-center">
