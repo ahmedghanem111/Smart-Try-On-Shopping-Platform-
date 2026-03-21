@@ -10,7 +10,7 @@ const products = [
     name: 'Classic Aviator Glasses',
     description: 'Timeless design with modern comfort',
     category: 'Eyewear',
-    modelPath: '/glass6.glb',
+    modelPath: '/t-shirt9.glb',
     scale: 2,
     price: '$129.99',
     features: ['Premium quality materials', 'UV protection coating', 'Lightweight and durable design', 'Adjustable for perfect fit'],
