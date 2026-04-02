@@ -14,9 +14,10 @@ const Navbar = () => {
   const navLinks = [
     { id: 'home', label: 'Home', href: '/' },
     { id: 'products', label: 'Products', href: '/product' },
-    { id: 'try-on', label: 'Find My Fit', href: '/try-on' },
+    { id: 'try-on', label: 'Find My Fit', href: '/find-my-fit' }, 
     { id: 'brands', label: 'Brands', href: '/brand' },
     { id: 'contact', label: 'Contact', href: '/contact' },
+    
   ];
 
   return (
