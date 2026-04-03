@@ -19,12 +19,21 @@ const productSchema = mongoose.Schema({
     },
     name: { type: String, required: true },
     image: { type: String, required: true },
+    imageId: { type: String }, // cloud id
+
+    glbModel: {
+        type: String,
+        required: false,
+        default: ''
+    },
+    glbModelId: { type: String },
+
     brand: { type: String, required: true },
 
     category: {
         type: String,
         required: true,
-        enum: ['Clothes', 'Watches', 'Jewellery', 'Scarves', 'Footwear', 'Bags']
+        enum: ['Clothes', 'Watches', 'Jewellery', 'Scarves', 'Footwear', 'Bags', 'Accessories']
     },
 
     subCategory: {
@@ -38,12 +47,6 @@ const productSchema = mongoose.Schema({
     numReviews: { type: Number, required: true, default: 0 },
     price: { type: Number, required: true, default: 0 },
     countInStock: { type: Number, required: true, default: 0 },
-
-    glbModel: {
-        type: String,
-        required: false, //for now
-        default: '' ///models/default-tee.glb
-    },
 }, {
     timestamps: true,
 });
