@@ -1,48 +1,529 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
+import Image from 'next/image'
 import { API } from '@/lib/axios'
 
-const statCards = (summary) => [
-  {
-    label: 'Total Revenue',
-    value: `$${Number(summary?.totalSales || 0).toFixed(2)}`,
-    icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-  },
-  {
-    label: 'Total Orders',
-    value: summary?.numOrders ?? '—',
-    icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z',
-  },
-  {
-    label: 'Total Users',
-    value: summary?.userCount ?? '—',
-    icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z',
-  },
-  {
-    label: 'Total Products',
-    value: summary?.productCount ?? '—',
-    icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
-  },
-]
+// ─── tiny helpers ────────────────────────────────────────────────────────────
+function StatCard({ label, value, icon, loading }) {
+  return (
+    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 space-y-4">
+      <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+        <svg className="w-5 h-5 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={icon} />
+        </svg>
+      </div>
+      <div>
+        <p className="text-xs font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500">{label}</p>
+        <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+          {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-600">···</span> : value}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function Modal({ open, onClose, title, children }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+      >
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-slate-700">
+          <h3 className="font-serif text-lg text-slate-900 dark:text-white">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-6">{children}</div>
+      </motion.div>
+    </div>
+  )
+}
+
+const INPUT = "w-full px-4 py-3 text-sm bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-slate-400 dark:focus:border-slate-500 transition-colors"
+const BTN_PRIMARY = "px-5 py-2.5 text-sm font-medium tracking-wider bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+const BTN_GHOST = "px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+
+// ─── OVERVIEW TAB ─────────────────────────────────────────────────────────────
+function OverviewTab({ summary, recentUsers, recentProducts, loading }) {
+  const stats = [
+    { label: 'Total Revenue', value: `${Number(summary?.totalSales || 0).toFixed(0)} EGP`, icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+    { label: 'Total Orders', value: summary?.numOrders ?? '—', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z' },
+    { label: 'Total Users', value: summary?.userCount ?? '—', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+    { label: 'Total Products', value: summary?.productCount ?? '—', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+  ]
+
+  return (
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((s, i) => (
+          <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
+            <StatCard {...s} loading={loading} />
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Recent Users */}
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+            <h2 className="font-semibold text-slate-900 dark:text-white">Recent Users</h2>
+            <span className="text-xs text-slate-400">Latest 5</span>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+            {loading ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="px-6 py-4 flex items-center gap-3 animate-pulse">
+                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
+                  <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-1/2" />
+                </div>
+              </div>
+            )) : recentUsers.map(u => (
+              <div key={u._id} className="px-6 py-3.5 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-slate-900 dark:bg-white flex items-center justify-center text-white dark:text-slate-900 text-xs font-bold flex-shrink-0">
+                  {u.name?.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{u.name}</p>
+                  <p className="text-xs text-slate-400 truncate">{u.email}</p>
+                </div>
+                {u.isAdmin && <span className="text-[10px] px-2 py-0.5 border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 rounded-full">Admin</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Products */}
+        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+            <h2 className="font-semibold text-slate-900 dark:text-white">Recent Products</h2>
+            <span className="text-xs text-slate-400">Latest 5</span>
+          </div>
+          <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+            {loading ? Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="px-6 py-4 flex items-center gap-3 animate-pulse">
+                <div className="w-10 h-10 rounded-lg bg-slate-200 dark:bg-slate-700" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-2/5" />
+                  <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-1/4" />
+                </div>
+              </div>
+            )) : recentProducts.map(p => (
+              <div key={p._id} className="px-6 py-3.5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden flex-shrink-0 relative">
+                  {p.image ? <Image src={p.image} alt={p.name} fill className="object-cover" sizes="40px" /> : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{p.name}</p>
+                  <p className="text-xs text-slate-400">{p.category}</p>
+                </div>
+                <span className="text-sm font-semibold text-slate-900 dark:text-white">{p.price} EGP</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── USERS TAB ────────────────────────────────────────────────────────────────
+function UsersTab() {
+  const { toast } = useToast()
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('All')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [form, setForm] = useState({ name: '', email: '', password: '', isAdmin: false })
+  const [saving, setSaving] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    try { const { data } = await API.get('/api/users'); setUsers(data) }
+    catch { toast.error('Failed to load users') }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { load() }, [])
+
+  const handleDelete = async () => {
+    try {
+      await API.delete(`/api/users/${deleteTarget._id}`)
+      toast.success('User deleted')
+      setDeleteTarget(null)
+      load()
+    } catch { toast.error('Failed to delete user') }
+  }
+
+  const handleAdd = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await API.post('/api/users', form)
+      toast.success('User created')
+      setAddOpen(false)
+      setForm({ name: '', email: '', password: '', isAdmin: false })
+      load()
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to create user') }
+    finally { setSaving(false) }
+  }
+
+  const filtered = users.filter(u => {
+    const matchSearch = u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
+    const matchRole = roleFilter === 'All' || (roleFilter === 'Admin' ? u.isAdmin : !u.isAdmin)
+    return matchSearch && matchRole
+  })
+
+  return (
+    <div className="space-y-6">
+      {/* toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="flex gap-2 flex-wrap">
+          {['All', 'Admin', 'User'].map(r => (
+            <button key={r} onClick={() => setRoleFilter(r)}
+              className={`px-4 py-1.5 text-xs font-medium tracking-wider rounded-full border transition-all ${roleFilter === r ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-500'}`}>
+              {r}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-56">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search users..." className={`${INPUT} pl-9`} />
+          </div>
+          <button onClick={() => setAddOpen(true)} className={BTN_PRIMARY}>+ Add User</button>
+        </div>
+      </div>
+
+      {/* table */}
+      <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 dark:border-slate-700">
+                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">User</th>
+                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Email</th>
+                <th className="text-left px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Role</th>
+                <th className="text-right px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+              {loading ? Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="animate-pulse">
+                  <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700" /><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24" /></div></td>
+                  <td className="px-6 py-4"><div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-36" /></td>
+                  <td className="px-6 py-4"><div className="h-5 bg-slate-100 dark:bg-slate-800 rounded w-14" /></td>
+                  <td className="px-6 py-4" />
+                </tr>
+              )) : filtered.map(u => (
+                <tr key={u._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-900 dark:bg-white flex items-center justify-center text-white dark:text-slate-900 text-xs font-bold flex-shrink-0">
+                        {u.name?.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-medium text-slate-900 dark:text-white">{u.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{u.email}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-full border ${u.isAdmin ? 'border-amber-300 dark:border-amber-600 text-amber-600 dark:text-amber-400' : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400'}`}>
+                      {u.isAdmin ? 'Admin' : 'User'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={() => setDeleteTarget(u)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!loading && filtered.length === 0 && <p className="text-center py-10 text-slate-400 text-sm">No users found.</p>}
+        </div>
+      </div>
+
+      {/* Delete confirm */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <Modal open title="Delete User" onClose={() => setDeleteTarget(null)}>
+            <p className="text-slate-600 dark:text-slate-400 mb-6">Are you sure you want to delete <span className="font-semibold text-slate-900 dark:text-white">{deleteTarget.name}</span>? This cannot be undone.</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setDeleteTarget(null)} className={BTN_GHOST}>Cancel</button>
+              <button onClick={handleDelete} className="px-5 py-2.5 text-sm font-medium bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors">Delete</button>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      {/* Add user */}
+      <AnimatePresence>
+        {addOpen && (
+          <Modal open title="Add New User" onClose={() => setAddOpen(false)}>
+            <form onSubmit={handleAdd} className="space-y-4">
+              <div><label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Name</label><input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={INPUT} placeholder="Full name" /></div>
+              <div><label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Email</label><input required type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className={INPUT} placeholder="email@example.com" /></div>
+              <div><label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Password</label><input required type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} className={INPUT} placeholder="Min 8 characters" /></div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={form.isAdmin} onChange={e => setForm(f => ({ ...f, isAdmin: e.target.checked }))} className="w-4 h-4 rounded" />
+                <span className="text-sm text-slate-700 dark:text-slate-300">Admin role</span>
+              </label>
+              <div className="flex gap-3 justify-end pt-2">
+                <button type="button" onClick={() => setAddOpen(false)} className={BTN_GHOST}>Cancel</button>
+                <button type="submit" disabled={saving} className={BTN_PRIMARY}>{saving ? 'Creating...' : 'Create User'}</button>
+              </div>
+            </form>
+          </Modal>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ─── PRODUCTS TAB ─────────────────────────────────────────────────────────────
+const CATEGORIES = ['Clothes', 'Watches', 'Jewellery', 'Scarves', 'Footwear', 'Bags', 'Accessories']
+const EMPTY_PRODUCT = { name: '', brand: '', category: 'Clothes', description: '', price: '', countInStock: '', image: '', glbModel: '' }
+
+function ProductsTab() {
+  const { toast } = useToast()
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [catFilter, setCatFilter] = useState('All')
+  const [search, setSearch] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState(null) // null = add, object = edit
+  const [form, setForm] = useState(EMPTY_PRODUCT)
+  const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [uploading, setUploading] = useState({ image: false, glb: false })
+  const imageRef = useRef()
+  const glbRef = useRef()
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const { data } = await API.get('/api/products?pageNumber=1')
+      setProducts(data.products || [])
+    } catch { toast.error('Failed to load products') }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { load() }, [])
+
+  const openAdd = () => { setEditing(null); setForm(EMPTY_PRODUCT); setModalOpen(true) }
+  const openEdit = (p) => {
+    setEditing(p)
+    setForm({ name: p.name, brand: p.brand, category: p.category, description: p.description, price: p.price, countInStock: p.countInStock, image: p.image, glbModel: p.glbModel || '' })
+    setModalOpen(true)
+  }
+
+  const uploadFile = async (file, field) => {
+    const key = field === 'image' ? 'image' : 'glb'
+    setUploading(u => ({ ...u, [key]: true }))
+    try {
+      const fd = new FormData(); fd.append('file', file)
+      const { data } = await API.post('/api/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      setForm(f => ({ ...f, [field]: data.url }))
+      toast.success(`${key === 'image' ? 'Image' : '3D model'} uploaded`)
+    } catch { toast.error('Upload failed') }
+    finally { setUploading(u => ({ ...u, [key]: false })) }
+  }
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      if (editing) {
+        await API.put(`/api/products/${editing._id}`, { ...form, price: Number(form.price), countInStock: Number(form.countInStock) })
+        toast.success('Product updated')
+      } else {
+        await API.post('/api/products', { ...form, price: Number(form.price), countInStock: Number(form.countInStock) })
+        toast.success('Product created')
+      }
+      setModalOpen(false)
+      load()
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to save product') }
+    finally { setSaving(false) }
+  }
+
+  const handleDelete = async () => {
+    try {
+      await API.delete(`/api/products/${deleteTarget._id}`)
+      toast.success('Product deleted')
+      setDeleteTarget(null)
+      load()
+    } catch { toast.error('Failed to delete product') }
+  }
+
+  const filtered = products.filter(p => {
+    const matchCat = catFilter === 'All' || p.category === catFilter
+    const matchSearch = p.name?.toLowerCase().includes(search.toLowerCase()) || p.brand?.toLowerCase().includes(search.toLowerCase())
+    return matchCat && matchSearch
+  })
+
+  return (
+    <div className="space-y-6">
+      {/* toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="flex gap-2 flex-wrap">
+          {['All', ...CATEGORIES].map(c => (
+            <button key={c} onClick={() => setCatFilter(c)}
+              className={`px-3 py-1.5 text-xs font-medium tracking-wider rounded-full border transition-all ${catFilter === c ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-500'}`}>
+              {c}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-56">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search products..." className={`${INPUT} pl-9`} />
+          </div>
+          <button onClick={openAdd} className={BTN_PRIMARY}>+ Add Product</button>
+        </div>
+      </div>
+
+      {/* grid */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        {loading ? Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden animate-pulse">
+            <div className="aspect-square bg-slate-200 dark:bg-slate-700" />
+            <div className="p-4 space-y-2"><div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-3/4" /><div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-1/2" /></div>
+          </div>
+        )) : filtered.map(p => (
+          <div key={p._id} className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden group">
+            <div className="aspect-square relative bg-slate-100 dark:bg-slate-800">
+              {p.image ? <Image src={p.image} alt={p.name} fill className="object-cover" sizes="(max-width: 768px) 50vw, 25vw" /> : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </div>
+              )}
+              {p.glbModel && (
+                <div className="absolute top-2 right-2 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-white/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-600 rounded-full text-slate-600 dark:text-slate-300">3D</div>
+              )}
+              {p.countInStock === 0 && (
+                <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Out of Stock</span>
+                </div>
+              )}
+            </div>
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white leading-snug truncate">{p.name}</h4>
+                <span className="text-sm font-bold text-slate-900 dark:text-white flex-shrink-0">{p.price} EGP</span>
+              </div>
+              <p className="text-xs text-slate-400 mb-3">{p.brand} · {p.category}</p>
+              <div className="flex gap-2">
+                <button onClick={() => openEdit(p)} className="flex-1 py-1.5 text-xs font-medium border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Edit</button>
+                <button onClick={() => setDeleteTarget(p)} className="flex-1 py-1.5 text-xs font-medium border border-red-200 dark:border-red-900/50 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Delete</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {!loading && filtered.length === 0 && <p className="text-center py-10 text-slate-400 text-sm">No products found.</p>}
+
+      {/* Add/Edit modal */}
+      <AnimatePresence>
+        {modalOpen && (
+          <Modal open title={editing ? 'Edit Product' : 'Add Product'} onClose={() => setModalOpen(false)}>
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2"><label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Name</label><input required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={INPUT} placeholder="Product name" /></div>
+                <div><label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Brand</label><input required value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))} className={INPUT} placeholder="Brand" /></div>
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Category</label>
+                  <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className={INPUT}>
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div><label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Price (EGP)</label><input required type="number" min="0" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className={INPUT} placeholder="0" /></div>
+                <div><label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Stock</label><input required type="number" min="0" value={form.countInStock} onChange={e => setForm(f => ({ ...f, countInStock: e.target.value }))} className={INPUT} placeholder="0" /></div>
+                <div className="col-span-2"><label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Description</label><textarea required rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className={`${INPUT} resize-none`} placeholder="Product description" /></div>
+              </div>
+
+              {/* Image upload */}
+              <div>
+                <label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">Product Image</label>
+                <div className="flex gap-3 items-center">
+                  <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files[0] && uploadFile(e.target.files[0], 'image')} />
+                  <button type="button" onClick={() => imageRef.current.click()} disabled={uploading.image} className={`${BTN_GHOST} flex-shrink-0`}>
+                    {uploading.image ? 'Uploading...' : 'Upload Image'}
+                  </button>
+                  {form.image && <span className="text-xs text-emerald-500 truncate">✓ Image uploaded</span>}
+                </div>
+              </div>
+
+              {/* GLB upload */}
+              <div>
+                <label className="block text-xs uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1.5">3D Model (GLB) — optional</label>
+                <div className="flex gap-3 items-center">
+                  <input ref={glbRef} type="file" accept=".glb,.gltf" className="hidden" onChange={e => e.target.files[0] && uploadFile(e.target.files[0], 'glbModel')} />
+                  <button type="button" onClick={() => glbRef.current.click()} disabled={uploading.glb} className={`${BTN_GHOST} flex-shrink-0`}>
+                    {uploading.glb ? 'Uploading...' : 'Upload GLB'}
+                  </button>
+                  {form.glbModel && <span className="text-xs text-emerald-500 truncate">✓ 3D model uploaded</span>}
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button type="button" onClick={() => setModalOpen(false)} className={BTN_GHOST}>Cancel</button>
+                <button type="submit" disabled={saving || uploading.image || uploading.glb} className={BTN_PRIMARY}>{saving ? 'Saving...' : editing ? 'Save Changes' : 'Create Product'}</button>
+              </div>
+            </form>
+          </Modal>
+        )}
+      </AnimatePresence>
+
+      {/* Delete confirm */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <Modal open title="Delete Product" onClose={() => setDeleteTarget(null)}>
+            <p className="text-slate-600 dark:text-slate-400 mb-6">Delete <span className="font-semibold text-slate-900 dark:text-white">{deleteTarget.name}</span>? This cannot be undone.</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setDeleteTarget(null)} className={BTN_GHOST}>Cancel</button>
+              <button onClick={handleDelete} className="px-5 py-2.5 text-sm font-medium bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors">Delete</button>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
+const TABS = ['Overview', 'Users', 'Products']
 
 export default function DashboardPage() {
   const { user } = useAuth()
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState('Overview')
   const [summary, setSummary] = useState(null)
-  const [users, setUsers] = useState([])
-  const [products, setProducts] = useState([])
+  const [recentUsers, setRecentUsers] = useState([])
+  const [recentProducts, setRecentProducts] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!user) { router.push('/login'); return }
     if (!user.isAdmin) { router.push('/'); return }
 
-    const fetchAll = async () => {
+    const fetchOverview = async () => {
       try {
         const [sumRes, usersRes, prodsRes] = await Promise.all([
           API.get('/api/orders/summary'),
@@ -50,191 +531,54 @@ export default function DashboardPage() {
           API.get('/api/products'),
         ])
         setSummary(sumRes.data)
-        setUsers(usersRes.data.slice(0, 6))
-        setProducts(prodsRes.data.products?.slice(0, 6) ?? [])
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
-      }
+        setRecentUsers(usersRes.data.slice(0, 5))
+        setRecentProducts(prodsRes.data.products?.slice(0, 5) ?? [])
+      } catch (e) { console.error(e) }
+      finally { setLoading(false) }
     }
-    fetchAll()
+    fetchOverview()
   }, [user, router])
 
   if (!user || !user.isAdmin) return null
 
   return (
-    <section className="min-h-screen bg-slate-50 dark:bg-slate-900 py-12 px-4 font-serif">
-      <div className="max-w-6xl mx-auto space-y-10">
+    <section className="min-h-screen bg-slate-50 dark:bg-slate-900 py-10 px-4 font-serif">
+      <div className="max-w-7xl mx-auto space-y-8">
 
-        {/* Page header */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex items-center justify-between"
-        >
+        {/* Header */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
-            <p className="text-base text-slate-500 dark:text-slate-400 mt-1">Welcome back, {user.name}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Welcome back, {user.name}</p>
           </div>
-          <Link
-            href="/"
-            className="text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-200"
-          >
-            ← Back to site
-          </Link>
+          <Link href="/" className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">← Back to site</Link>
         </motion.div>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {statCards(summary).map(({ label, value, icon }, i) => (
-            <motion.div
-              key={label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.08 }}
-              className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 space-y-4"
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
+          {TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-3 text-sm font-medium tracking-wide transition-colors border-b-2 -mb-px ${
+                activeTab === tab
+                  ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
             >
-              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                <svg className="w-5 h-5 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={icon} />
-                </svg>
-              </div>
-              <div>
-                <p className="text-xs font-semibold tracking-widest uppercase text-slate-400 dark:text-slate-500">{label}</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
-                  {loading ? <span className="animate-pulse text-slate-300 dark:text-slate-600">···</span> : value}
-                </p>
-              </div>
-            </motion.div>
+              {tab}
+            </button>
           ))}
         </div>
 
-        {/* Tables row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-          {/* Recent Users */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden"
-          >
-            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">Recent Users</h2>
-              <span className="text-xs text-slate-400 dark:text-slate-500">Latest 6</span>
-            </div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-700">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="px-6 py-4 flex items-center gap-3 animate-pulse">
-                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
-                      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-1/2" />
-                    </div>
-                  </div>
-                ))
-              ) : users.length === 0 ? (
-                <p className="px-6 py-8 text-sm text-slate-400 text-center">No users found</p>
-              ) : (
-                users.map((u) => (
-                  <div key={u._id} className="px-6 py-4 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-900 dark:bg-white flex items-center justify-center text-white dark:text-slate-900 text-sm font-bold flex-shrink-0">
-                      {u.name?.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{u.name}</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{u.email}</p>
-                    </div>
-                    {u.isAdmin && (
-                      <span className="text-xs px-2 py-0.5 border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400 rounded-full">
-                        Admin
-                      </span>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+        {/* Tab content */}
+        <AnimatePresence mode="wait">
+          <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+            {activeTab === 'Overview' && <OverviewTab summary={summary} recentUsers={recentUsers} recentProducts={recentProducts} loading={loading} />}
+            {activeTab === 'Users' && <UsersTab />}
+            {activeTab === 'Products' && <ProductsTab />}
           </motion.div>
-
-          {/* Recent Products */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden"
-          >
-            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">Recent Products</h2>
-              <Link
-                href="/product"
-                className="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
-              >
-                View all →
-              </Link>
-            </div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-700">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="px-6 py-4 flex items-center gap-3 animate-pulse">
-                    <div className="w-10 h-10 rounded-lg bg-slate-200 dark:bg-slate-700" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-2/5" />
-                      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-1/4" />
-                    </div>
-                  </div>
-                ))
-              ) : products.length === 0 ? (
-                <p className="px-6 py-8 text-sm text-slate-400 text-center">No products found</p>
-              ) : (
-                products.map((p) => (
-                  <div key={p._id} className="px-6 py-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden flex-shrink-0">
-                      {p.image ? (
-                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{p.name}</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">{p.category}</p>
-                    </div>
-                    <span className="text-sm font-semibold text-slate-900 dark:text-white">${p.price}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </motion.div>
-
-        </div>
-
-        {/* Quick links */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Products', href: '/product', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-            { label: 'Try-On', href: '/try-on', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-            { label: 'Profile', href: '/profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
-            { label: 'Contact', href: '/contact', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
-          ].map(({ label, href, icon }) => (
-            <Link
-              key={label}
-              href={href}
-              className="flex flex-col items-center gap-2 p-5 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-slate-400 dark:hover:border-slate-500 transition-colors duration-200 group"
-            >
-              <svg className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={icon} />
-              </svg>
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">{label}</span>
-            </Link>
-          ))}
-        </div>
+        </AnimatePresence>
 
       </div>
     </section>

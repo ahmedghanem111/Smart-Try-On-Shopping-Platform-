@@ -1,81 +1,109 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Model3D from '@/components/ui/Model3D';
-import { motion } from 'framer-motion';
+import Image from 'next/image';
+import Link from 'next/link';
+import { API } from '@/lib/axios';
 
-const products = [
-  {
-    id: 1,
-    name: 'Classic Aviator Glasses',
-    description: 'Timeless design with modern comfort',
-    category: 'Eyewear',
-    modelPath: '/t-shirt9.glb',
-    scale: 2,
-    price: '$129.99',
-    features: ['Premium quality materials', 'UV protection coating', 'Lightweight and durable design', 'Adjustable for perfect fit'],
-  },
-  {
-    id: 2,
-    name: 'Modern Round Frames',
-    description: 'Contemporary style meets functionality',
-    category: 'Eyewear',
-    modelPath: '/glass4.glb',
-    scale: 2,
-    price: '$149.99',
-    features: ['Premium quality materials', 'UV protection coating', 'Lightweight and durable design', 'Adjustable for perfect fit'],
-  },
-  {
-    id: 3,
-    name: 'Designer Square Glasses',
-    description: 'Bold statement for the fashion-forward',
-    category: 'Eyewear',
-    modelPath: '/glass3.glb',
-    scale: 2,
-    price: '$179.99',
-    features: ['Premium quality materials', 'UV protection coating', 'Lightweight and durable design', 'Adjustable for perfect fit'],
-  },
-  {
-    id: 4,
-    name: 'Essential White T-Shirt',
-    description: 'Clean, minimal everyday essential in premium cotton',
-    category: 'Clothing',
-    modelPath: '/t-shirt1.glb',
-    scale: 1,
-    price: '$49.99',
-    features: ['100% premium cotton', 'Relaxed modern fit', 'Pre-shrunk fabric', 'Available in multiple sizes'],
-  },
+const CATEGORIES = ['All', 'Clothes', 'Accessories', 'Bags'];
 
-  {
-    id: 6,
-    name: 'Oversized Drop T-Shirt',
-    description: 'Relaxed oversized silhouette for a streetwear look',
-    category: 'Clothing',
-    modelPath: '/t-shirt3.glb',
-    scale: 1,
-    price: '$54.99',
-    features: ['Heavyweight cotton blend', 'Oversized drop shoulder', 'Ribbed collar', 'Available in multiple sizes'],
-  },
+function StarRating({ rating }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <svg key={star} className={`w-3.5 h-3.5 ${star <= Math.round(rating) ? 'text-amber-400' : 'text-slate-300 dark:text-slate-600'}`} fill="currentColor" viewBox="0 0 20 20">
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
 
-
-
-
-
-];
+// Shows 3D if glbModel exists, otherwise falls back to image
+function ProductViewer({ product, isCard = false }) {
+  if (product.glbModel) {
+    return <Model3D modelPath={product.glbModel} />;
+  }
+  return (
+    <Image
+      src={product.image}
+      alt={product.name}
+      fill
+      className="object-cover"
+      sizes={isCard ? '(max-width: 768px) 100vw, 25vw' : '50vw'}
+    />
+  );
+}
 
 export default function Products() {
-  const [selectedProduct, setSelectedProduct] = useState(0);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      setLoading(true);
+      try {
+        const { data } = await API.get(`/api/products?pageNumber=${page}`);
+        console.log('API response:', data);
+        setProducts(data.products || []);
+        setPages(data.pages || 1);
+        setSelectedIdx(0);
+      } catch (e) {
+        console.error('Failed to fetch products:', e);
+        setProducts([]);
+        setError(e.message || 'Failed to load products');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProducts();
+  }, [page]);
+
+  const filtered = activeCategory === 'All'
+    ? products
+    : products.filter(p => p.category === activeCategory);
+
+  const selected = filtered[selectedIdx] || products[0];
+
+  const handleSelect = (index) => {
+    setSelectedIdx(index);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-slate-900 flex items-center justify-center">
+        <div className="space-y-3 text-center">
+          <div className="w-10 h-10 border-2 border-slate-300 dark:border-slate-600 border-t-slate-900 dark:border-t-white rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-slate-400 dark:text-slate-500">Loading products...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!products.length) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-slate-900 flex flex-col items-center justify-center gap-3">
+        <p className="text-slate-400 dark:text-slate-500">No products found.</p>
+        {error && <p className="text-xs text-red-400">{error}</p>}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors duration-300">
-      
+
+      {/* Hero */}
       <section className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center space-y-4"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-4">
             <span className="inline-block px-4 py-1.5 text-xs font-medium tracking-wider text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-full">
               3D Product Viewer
             </span>
@@ -89,126 +117,192 @@ export default function Products() {
         </div>
       </section>
 
-      <section className="bg-white dark:bg-slate-900 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            
-            <motion.div 
-              key={`main-${selectedProduct}`}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              className="relative bg-slate-100  rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700"
-              style={{ aspectRatio: '1/1' }}
-            >
-              <Model3D key={`main-model-${selectedProduct}`} modelPath={products[selectedProduct].modelPath} />
-              
-              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
-                <span className="inline-block px-4 py-2 text-xs font-medium tracking-wider text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-slate-600 rounded-full">
-                  Drag to rotate • Scroll to zoom
-                </span>
-              </div>
-            </motion.div>
+      {/* Featured viewer */}
+      {selected && (
+        <section className="bg-white dark:bg-slate-900 py-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
 
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="space-y-8"
-            >
-              <div>
-                <span className="inline-block px-3 py-1 text-[10px] uppercase tracking-[0.3em] font-semibold text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-600 rounded-full mb-4">
-                  {products[selectedProduct].category}
-                </span>
-                <h2 className="text-4xl md:text-5xl font-serif text-slate-900 dark:text-white mb-4">
-                  {products[selectedProduct].name}
-                </h2>
-                <p className="text-slate-600 dark:text-slate-400 text-lg leading-relaxed mb-6">
-                  {products[selectedProduct].description}
-                </p>
-                <p className="text-3xl font-medium text-slate-900 dark:text-white">
-                  {products[selectedProduct].price}
-                </p>
-              </div>
-
-              <div className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-700">
-                <h3 className="text-sm uppercase tracking-wider font-medium text-slate-900 dark:text-white">
-                  Features
-                </h3>
-                <ul className="space-y-3">
-                  {products[selectedProduct].features.map((f) => (
-                    <li key={f} className="flex items-start gap-3">
-                      <span className="w-2 h-2 rounded-full bg-slate-900 dark:bg-slate-300 mt-2 flex-shrink-0"></span>
-                      <span className="text-slate-600 dark:text-slate-400">{f}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="flex gap-4 pt-6">
-                <button className="flex-1 px-8 py-3 text-sm font-medium tracking-wider bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors duration-200">
-                  ADD TO CART
-                </button>
-                <button className="px-6 py-3 text-sm font-medium tracking-wider border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors duration-200">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-12">
-            <h3 className="text-3xl md:text-4xl font-serif text-slate-900 dark:text-white mb-2">
-              All Products
-            </h3>
-            <p className="text-slate-600 dark:text-slate-400">
-              Click on any product to view in 3D
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {products.map((product, index) => (
               <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                onClick={() => {
-                  setSelectedProduct(index);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className={`cursor-pointer group bg-white dark:bg-slate-900 border-2 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl ${
-                  selectedProduct === index 
-                    ? 'border-slate-900 dark:border-white shadow-lg' 
-                    : 'border-slate-200 dark:border-slate-700'
-                }`}
+                key={`main-${selected._id}`}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="relative bg-slate-100 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700"
+                style={{ aspectRatio: '1/1' }}
               >
-                <div className="aspect-square relative bg-gradient-to-b from-slate-100 to-slate-50  ">
-                  <Model3D key={`card-model-${product.id}`} modelPath={product.modelPath} />
+                <ProductViewer product={selected} />
+                {selected.glbModel && (
+                  <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
+                    <span className="inline-block px-4 py-2 text-xs font-medium tracking-wider text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-slate-600 rounded-full">
+                      Drag to rotate • Scroll to zoom
+                    </span>
+                  </div>
+                )}
+              </motion.div>
+
+              <motion.div
+                key={`info-${selected._id}`}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.15 }}
+                className="space-y-8"
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="inline-block px-3 py-1 text-[10px] uppercase tracking-[0.3em] font-semibold text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-600 rounded-full">
+                      {selected.category}
+                    </span>
+                    {selected.subCategory && (
+                      <span className="inline-block px-3 py-1 text-[10px] uppercase tracking-[0.3em] font-semibold text-slate-500 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded-full">
+                        {selected.subCategory}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-4xl md:text-5xl font-serif text-slate-900 dark:text-white mb-2">
+                    {selected.name}
+                  </h2>
+                  <p className="text-sm text-slate-400 dark:text-slate-500 mb-4 uppercase tracking-widest">
+                    {selected.brand}
+                  </p>
+                  <div className="flex items-center gap-3 mb-6">
+                    <StarRating rating={selected.rating} />
+                    <span className="text-sm text-slate-400 dark:text-slate-500">({selected.numReviews} reviews)</span>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-400 text-lg leading-relaxed mb-6">
+                    {selected.description}
+                  </p>
+                  <p className="text-3xl font-medium text-slate-900 dark:text-white">
+                    {selected.price} EGP
+                  </p>
                 </div>
-                <div className="p-6">
-                  <span className="inline-block px-2 py-1 text-[9px] uppercase tracking-[0.2em] font-semibold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-full mb-3">
-                    {product.category}
-                  </span>
-                  <h4 className="text-xl font-serif text-slate-900 dark:text-white mb-2">
-                    {product.name}
-                  </h4>
-                  <p className="text-slate-600 dark:text-slate-400 text-sm mb-4">
-                    {product.description}
-                  </p>
-                  <p className="text-lg font-medium text-slate-900 dark:text-white">
-                    {product.price}
-                  </p>
+
+                <div className="flex gap-4 pt-2">
+                  <Link
+                    href={`/product/${selected._id}`}
+                    className="flex-1 px-8 py-3.5 text-sm font-medium tracking-wider text-center bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all duration-200"
+                  >
+                    VIEW DETAILS
+                  </Link>
+                  <button className="px-5 py-3.5 text-sm font-medium tracking-wider border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors duration-200">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                  </button>
                 </div>
               </motion.div>
-            ))}
+            </div>
           </div>
+        </section>
+      )}
+
+      {/* All products grid */}
+      <section className="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-12">
+            <div>
+              <h3 className="text-3xl md:text-4xl font-serif text-slate-900 dark:text-white mb-2">All Products</h3>
+              <p className="text-slate-500 dark:text-slate-400">Click any product to view above</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => { setActiveCategory(cat); setSelectedIdx(0); }}
+                  className={`px-4 py-1.5 text-xs font-medium tracking-wider rounded-full border transition-all duration-200 ${
+                    activeCategory === cat
+                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white'
+                      : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-500 dark:hover:border-slate-400'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <AnimatePresence mode="popLayout">
+              {filtered.map((product, index) => {
+                const isSelected = selected?._id === product._id;
+                return (
+                  <motion.div
+                    key={product._id}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => handleSelect(index)}
+                    className={`cursor-pointer group bg-white dark:bg-slate-900 border-2 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/60 dark:hover:shadow-slate-900 ${
+                      isSelected
+                        ? 'border-slate-900 dark:border-white shadow-lg'
+                        : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <div className="aspect-square relative bg-gradient-to-b from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900">
+                      <ProductViewer product={product} isCard />
+                      {product.countInStock === 0 && (
+                        <div className="absolute inset-0 bg-white/70 dark:bg-slate-900/70 flex items-center justify-center">
+                          <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Out of Stock</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-5">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="inline-block px-2 py-1 text-[9px] uppercase tracking-[0.2em] font-semibold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 rounded-full">
+                          {product.category}
+                        </span>
+                        <StarRating rating={product.rating} />
+                      </div>
+                      <h4 className="text-lg font-serif text-slate-900 dark:text-white mb-1 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
+                        {product.name}
+                      </h4>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mb-3 uppercase tracking-widest">{product.brand}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-lg font-medium text-slate-900 dark:text-white">{product.price} EGP</p>
+                        <Link
+                          href={`/product/${product._id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
+                        >
+                          Details →
+                        </Link>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+
+          {/* Pagination */}
+          {pages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-16">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >← Prev</button>
+              {Array.from({ length: pages }, (_, i) => i + 1).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`w-9 h-9 text-sm rounded-xl border transition-colors ${
+                    p === page
+                      ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white'
+                      : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >{p}</button>
+              ))}
+              <button
+                onClick={() => setPage(p => Math.min(pages, p + 1))}
+                disabled={page === pages}
+                className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >Next →</button>
+            </div>
+          )}
         </div>
       </section>
     </div>
