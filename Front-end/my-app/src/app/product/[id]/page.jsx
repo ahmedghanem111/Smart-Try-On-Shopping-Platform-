@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
 import Model3D from '@/components/ui/Model3D';
+import { useGLTF } from '@react-three/drei';
 import { API } from '@/lib/axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -56,6 +57,7 @@ export default function ProductDetailPage() {
     try {
       const { data } = await API.get(`/api/products/${id}`);
       setProduct(data);
+      if (data.glbModel) useGLTF.preload(data.glbModel);
     } catch {
       router.push('/product');
     } finally {
@@ -114,7 +116,6 @@ export default function ProductDetailPage() {
 
   const tabs = [
     { id: 'details', label: 'Details' },
-    ...(product.glbModel ? [{ id: '3d', label: '3D View' }] : []),
     { id: 'reviews', label: `Reviews (${product.numReviews})` },
   ];
 
@@ -243,19 +244,6 @@ export default function ProductDetailPage() {
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2 text-sm text-slate-500 dark:text-slate-400">
                 <p>Brand: <span className="text-slate-700 dark:text-slate-300">{product.brand}</span></p>
                 {product.subCategory && <p>Sub-category: <span className="text-slate-700 dark:text-slate-300">{product.subCategory}</span></p>}
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === '3d' && product.glbModel && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <div className="relative max-w-xl mx-auto aspect-square rounded-2xl overflow-hidden bg-gradient-to-b from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700">
-                <Model3D modelPath={product.glbModel} />
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-                  <span className="px-4 py-2 text-xs font-medium tracking-wider text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-slate-600 rounded-full">
-                    Drag to rotate · Scroll to zoom
-                  </span>
-                </div>
               </div>
             </motion.div>
           )}

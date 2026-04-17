@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Model3D from '@/components/ui/Model3D';
+import { useGLTF } from '@react-three/drei';
 import Image from 'next/image';
 import Link from 'next/link';
 import { API } from '@/lib/axios';
@@ -21,8 +22,8 @@ function StarRating({ rating }) {
   );
 }
 
-// Shows 3D if glbModel exists, otherwise falls back to image
-function ProductViewer({ product, isCard = false }) {
+// Shows 3D only in the featured viewer; cards always use static image
+function ProductViewer({ product }) {
   if (product.glbModel) {
     return <Model3D modelPath={product.glbModel} />;
   }
@@ -32,7 +33,19 @@ function ProductViewer({ product, isCard = false }) {
       alt={product.name}
       fill
       className="object-cover"
-      sizes={isCard ? '(max-width: 768px) 100vw, 25vw' : '50vw'}
+      sizes="50vw"
+    />
+  );
+}
+
+function ProductCardImage({ product }) {
+  return (
+    <Image
+      src={product.image}
+      alt={product.name}
+      fill
+      className="object-cover group-hover:scale-105 transition-transform duration-500"
+      sizes="(max-width: 768px) 100vw, 25vw"
     />
   );
 }
@@ -50,11 +63,14 @@ export default function Products() {
     const loadProducts = async () => {
       setLoading(true);
       try {
-        const { data } = await API.get(`/api/products?pageNumber=${page}`);
+        const { data } = await API.get(`/api/products?pageNumber=${page}&pageSize=8`);
         console.log('API response:', data);
-        setProducts(data.products || []);
+        const list = data.products || [];
+        setProducts(list);
         setPages(data.pages || 1);
         setSelectedIdx(0);
+        // Preload the first product's 3D model immediately
+        if (list[0]?.glbModel) useGLTF.preload(list[0].glbModel);
       } catch (e) {
         console.error('Failed to fetch products:', e);
         setProducts([]);
@@ -74,6 +90,8 @@ export default function Products() {
 
   const handleSelect = (index) => {
     setSelectedIdx(index);
+    const model = filtered[index]?.glbModel;
+    if (model) useGLTF.preload(model);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -242,7 +260,7 @@ export default function Products() {
                     }`}
                   >
                     <div className="aspect-square relative bg-gradient-to-b from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900">
-                      <ProductViewer product={product} isCard />
+                      <ProductCardImage product={product} />
                       {product.countInStock === 0 && (
                         <div className="absolute inset-0 bg-white/70 dark:bg-slate-900/70 flex items-center justify-center">
                           <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Out of Stock</span>

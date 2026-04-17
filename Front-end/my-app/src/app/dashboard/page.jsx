@@ -320,8 +320,19 @@ function ProductsTab() {
   const load = async () => {
     setLoading(true)
     try {
-      const { data } = await API.get('/api/products?pageNumber=1')
-      setProducts(data.products || [])
+      // Fetch all pages so the admin sees every product
+      const first = await API.get('/api/products?pageNumber=1')
+      const totalPages = first.data.pages || 1
+      let all = first.data.products || []
+      if (totalPages > 1) {
+        const rest = await Promise.all(
+          Array.from({ length: totalPages - 1 }, (_, i) =>
+            API.get(`/api/products?pageNumber=${i + 2}`)
+          )
+        )
+        rest.forEach(r => { all = all.concat(r.data.products || []) })
+      }
+      setProducts(all)
     } catch { toast.error('Failed to load products') }
     finally { setLoading(false) }
   }
