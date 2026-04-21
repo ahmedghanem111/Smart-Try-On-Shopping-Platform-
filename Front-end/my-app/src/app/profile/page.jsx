@@ -1,12 +1,142 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
+import { API } from '@/lib/axios'
 
 const tabs = ['Account', 'Measurements', 'Orders', 'Wishlist']
+
+const PAYMENT_LABELS = { cash: 'Cash on Delivery', card: 'Card', paypal: 'PayPal' }
+
+function OrdersTab() {
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { data } = await API.get('/api/orders/myorders')
+        setOrders(data)
+      } catch {
+        setOrders([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="animate-pulse h-20 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+        ))}
+      </div>
+    )
+  }
+
+  if (orders.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+          <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+        </div>
+        <p className="text-slate-500 dark:text-slate-400 text-base mb-4">No orders yet</p>
+        <Link href="/product" className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-base font-medium rounded-full hover:opacity-90 transition-all">
+          Start Shopping
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {orders.map(order => (
+        <div
+          key={order._id}
+          className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden"
+        >
+          {/* Order header */}
+          <div className="flex items-center justify-between gap-4 flex-wrap px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="space-y-0.5">
+              <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-wider">{order._id}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod} · {new Date(order.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className={`px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-full border ${
+                order.isPaid
+                  ? 'border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400'
+                  : 'border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
+              }`}>
+                {order.isPaid ? 'Paid' : 'Unpaid'}
+              </span>
+              <span className={`px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider rounded-full border ${
+                order.isDelivered
+                  ? 'border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400'
+                  : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400'
+              }`}>
+                {order.isDelivered ? 'Delivered' : 'Pending'}
+              </span>
+            </div>
+          </div>
+
+          {/* Items */}
+          <div className="divide-y divide-slate-200 dark:divide-slate-700">
+            {order.orderItems.map((item, i) => (
+              <div key={i} className="flex items-center gap-4 px-5 py-4">
+                <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-700 flex-shrink-0">
+                  {item.image ? (
+                    <Image src={item.image} alt={item.name} fill className="object-cover" sizes="56px" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{item.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {item.qty} × {item.price} EGP
+                  </p>
+                </div>
+                <span className="text-sm font-semibold text-slate-900 dark:text-white flex-shrink-0">
+                  {(item.qty * item.price).toFixed(2)} EGP
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between px-5 py-4 bg-white dark:bg-slate-900/30 border-t border-slate-200 dark:border-slate-700">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+              Total: {Number(order.totalPrice).toFixed(2)} EGP
+            </p>
+            <Link
+              href={`/order/${order._id}`}
+              className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-1"
+            >
+              View details
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const ProfilePage = () => {
   const { user, logout } = useAuth()
@@ -169,20 +299,7 @@ const ProfilePage = () => {
           {activeTab === 'Orders' && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">Order History</h2>
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
-                  <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
-                </div>
-                <p className="text-slate-500 dark:text-slate-400 text-base mb-4">No orders yet</p>
-                <Link
-                  href="/product"
-                  className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-base font-medium rounded-full hover:bg-slate-700 dark:hover:bg-slate-100 transition-colors duration-200"
-                >
-                  Start Shopping
-                </Link>
-              </div>
+              <OrdersTab />
             </div>
           )}
 

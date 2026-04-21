@@ -10,6 +10,7 @@ import { useGLTF } from '@react-three/drei';
 import { API } from '@/lib/axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import { useCart } from '@/contexts/CartContext';
 
 function StarRating({ rating, interactive = false, value = 0, onChange }) {
   const [hovered, setHovered] = useState(0);
@@ -43,6 +44,7 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { addToCart } = useCart();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -68,12 +70,12 @@ export default function ProductDetailPage() {
   useEffect(() => { if (id) loadProduct(); }, [id]);
 
   const handleAddToCart = async () => {
-    if (!user) { toast.error('Please login to add to cart.'); return; }
+    if (!user) { router.push('/login'); return; }
     try {
-      await API.post('/api/cart', { productId: product._id, qty });
+      await addToCart(product, qty);
       toast.success('Added to cart!');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to add to cart.');
+      toast.error('Failed to add to cart.');
     }
   };
 

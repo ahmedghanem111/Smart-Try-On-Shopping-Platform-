@@ -5,11 +5,13 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCart } from '@/contexts/CartContext'
 
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme()
   const [isOpen, setIsOpen] = useState(false)
-  const {user,logout}=useAuth()
+  const { user, logout } = useAuth()
+  const { itemCount } = useCart()
 
   const navLinks = [
     { id: 'home', label: 'Home', href: '/' },
@@ -105,11 +107,20 @@ const Navbar = () => {
               )}
             </button>
 
-            <button className="p-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors duration-200">
+            <Link
+              href="/cart"
+              className="relative p-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors duration-200"
+              aria-label="Cart"
+            >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
-            </button>
+              {itemCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full leading-none">
+                  {itemCount > 99 ? '99+' : itemCount}
+                </span>
+              )}
+            </Link>
           </div>
 
           <div className="md:hidden flex items-center space-x-2">
@@ -152,6 +163,18 @@ const Navbar = () => {
                 {link.label}
               </Link>
             ))}
+            <Link
+              href="/cart"
+              className="flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors duration-200"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>CART</span>
+              {itemCount > 0 && (
+                <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[10px] font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full">
+                  {itemCount}
+                </span>
+              )}
+            </Link>
             {!user ? (
               <>
                 <Link

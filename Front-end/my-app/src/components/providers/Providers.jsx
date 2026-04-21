@@ -4,6 +4,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { CartProvider } from '@/contexts/CartContext'
 import ToastContainer from '@/components/ui/ToastContainer'
 
 export default function Providers({ children }) {
@@ -18,8 +19,10 @@ export default function Providers({ children }) {
       <ToastProvider>
         <AuthProvider>
           <ThemeProvider>
-            {children}
-            <ToastContainer />
+            <CartProvider>
+              {children}
+              <ToastContainer />
+            </CartProvider>
           </ThemeProvider>
         </AuthProvider>
       </ToastProvider>
