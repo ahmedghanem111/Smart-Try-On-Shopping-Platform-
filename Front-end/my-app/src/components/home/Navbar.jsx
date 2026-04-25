@@ -6,12 +6,14 @@ import Image from 'next/image'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
+import { useWishlist } from '@/contexts/WishlistContext'
 
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme()
   const [isOpen, setIsOpen] = useState(false)
   const { user, logout } = useAuth()
   const { itemCount } = useCart()
+  const { itemCount: wishlistCount } = useWishlist()
 
   const navLinks = [
     { id: 'home', label: 'Home', href: '/' },
@@ -121,6 +123,21 @@ const Navbar = () => {
                 </span>
               )}
             </Link>
+
+            <Link
+              href="/wishlist"
+              className="relative p-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors duration-200"
+              aria-label="Wishlist"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+              {wishlistCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full leading-none">
+                  {wishlistCount > 99 ? '99+' : wishlistCount}
+                </span>
+              )}
+            </Link>
           </div>
 
           <div className="md:hidden flex items-center space-x-2">
@@ -172,6 +189,18 @@ const Navbar = () => {
               {itemCount > 0 && (
                 <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[10px] font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full">
                   {itemCount}
+                </span>
+              )}
+            </Link>
+            <Link
+              href="/wishlist"
+              className="flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors duration-200"
+              onClick={() => setIsOpen(false)}
+            >
+              <span>WISHLIST</span>
+              {wishlistCount > 0 && (
+                <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full">
+                  {wishlistCount}
                 </span>
               )}
             </Link>

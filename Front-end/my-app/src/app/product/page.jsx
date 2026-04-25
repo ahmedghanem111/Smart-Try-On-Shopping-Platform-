@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Model3D from '@/components/ui/Model3D';
+import WishlistHeart from '@/components/ui/WishlistHeart';
 import { useGLTF } from '@react-three/drei';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -22,7 +23,7 @@ function StarRating({ rating }) {
   );
 }
 
-// Shows 3D only in the featured viewer; cards always use static image
+
 function ProductViewer({ product }) {
   if (product.glbModel) {
     return <Model3D modelPath={product.glbModel} />;
@@ -69,7 +70,6 @@ export default function Products() {
         setProducts(list);
         setPages(data.pages || 1);
         setSelectedIdx(0);
-        // Preload the first product's 3D model immediately
         if (list[0]?.glbModel) useGLTF.preload(list[0].glbModel);
       } catch (e) {
         console.error('Failed to fetch products:', e);
@@ -202,11 +202,9 @@ export default function Products() {
                   >
                     VIEW DETAILS
                   </Link>
-                  <button className="px-5 py-3.5 text-sm font-medium tracking-wider border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors duration-200">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                  </button>
+                  <div className="px-5 py-3.5 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-colors duration-200 flex items-center justify-center">
+                    <WishlistHeart productId={selected._id} size="lg" />
+                  </div>
                 </div>
               </motion.div>
             </div>
@@ -261,6 +259,9 @@ export default function Products() {
                   >
                     <div className="aspect-square relative bg-gradient-to-b from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900">
                       <ProductCardImage product={product} />
+                      <div className="absolute top-3 right-3 z-20">
+                        <WishlistHeart productId={product._id} size="md" />
+                      </div>
                       {product.countInStock === 0 && (
                         <div className="absolute inset-0 bg-white/70 dark:bg-slate-900/70 flex items-center justify-center">
                           <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Out of Stock</span>

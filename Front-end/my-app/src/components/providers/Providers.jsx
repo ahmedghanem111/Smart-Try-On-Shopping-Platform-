@@ -5,6 +5,7 @@ import { ToastProvider } from '@/contexts/ToastContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { CartProvider } from '@/contexts/CartContext'
+import { WishlistProvider } from '@/contexts/WishlistContext'
 import ToastContainer from '@/components/ui/ToastContainer'
 
 export default function Providers({ children }) {
@@ -20,8 +21,10 @@ export default function Providers({ children }) {
         <AuthProvider>
           <ThemeProvider>
             <CartProvider>
-              {children}
-              <ToastContainer />
+              <WishlistProvider>
+                {children}
+                <ToastContainer />
+              </WishlistProvider>
             </CartProvider>
           </ThemeProvider>
         </AuthProvider>
