@@ -43,9 +43,9 @@ const Register = () => {
         setSubmitting(false)
       }
     },
-  })
+  })  
 
-  return (
+  return ( 
     <section className="relative min-h-screen bg-white dark:bg-slate-900 flex items-center justify-center px-4 overflow-hidden transition-colors duration-500 font-serif">
       
       {/* Background Blobs */}

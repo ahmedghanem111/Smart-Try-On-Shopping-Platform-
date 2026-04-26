@@ -4,16 +4,33 @@ const User = require('../models/User')
 const cloudinary = require('../config/cloudinary');
 
 const generateTryOn = async (req, res) => {
-    const { personImage, garmentImage, description } = req.body;
+    const { personImage, garmentImage, description, roomId } = req.body;
 
     try {
-        const user = await User.findById(req.user._id);
+        if (global.io) {
+            global.activeRequests = (global.activeRequests || 0) + 1;
+            global.io.emit("admin:updateAnalytics", { 
+                type: "NEW_REQUEST", 
+                queueLength: global.activeRequests 
+            });
+        }
 
+        const user = await User.findById(req.user._id);
         if (!user.height || !user.weight) {
+
+            if (global.io) global.activeRequests--; 
             return res.status(400).json({
                 success: false,
                 message: "Profile Incomplete",
-                error: "Please enter your height and weight in your profile before using the Virtual Try-On."
+                error: "Please enter your height and weight in your profile."
+            });
+        }
+
+        // إبلاغ الأدمن إن المعالجة بدأت فعلياً
+        if (global.io) {
+            global.io.emit("admin:updateAnalytics", {
+                type: "TRYON_STARTED",
+                user: user.name
             });
         }
 
@@ -22,53 +39,69 @@ const generateTryOn = async (req, res) => {
         const garmentUpload = await cloudinary.uploader.upload(garmentImage, { folder: "fitme/garments" });
 
         console.log("Connecting to AI Engine...⏳");
-
-        const app = await Client.connect("yisol/IDM-VTON", {
-            token: process.env.HF_TOKEN
-        });
-
-        console.log("Running AI Try-On (Applying handle_file patch)...🤖");
+        const app = await Client.connect("yisol/IDM-VTON", { token: process.env.HF_TOKEN });
 
         const result = await app.predict("/tryon", [
-            {
-                "background": handle_file(personUpload.secure_url),
-                "layers": [],
-                "composite": null
-            },
+            { "background": handle_file(personUpload.secure_url), "layers": [], "composite": null },
             handle_file(garmentUpload.secure_url),
             description || "fashionable garment",
-            true,
-            true,
-            30,
-            42
+            true, true, 30, 42
         ]);
 
         const tempAiUrl = result.data[0].url;
-
-        console.log("Saving AI result to permanent storage...");
-        const finalResultUpload = await cloudinary.uploader.upload(tempAiUrl, {
-            folder: "fitme/results"
-        });
+        const finalResultUpload = await cloudinary.uploader.upload(tempAiUrl, { folder: "fitme/results" });
 
         const newTryOn = await TryOn.create({
             user: req.user._id,
+            resultImage: finalResultUpload.secure_url,
             personImage: personUpload.secure_url,
             personImageId: personUpload.public_id,
             garmentImage: garmentUpload.secure_url,
             garmentImageId: garmentUpload.public_id,
-            resultImage: finalResultUpload.secure_url,
             resultImageId: finalResultUpload.public_id,
             description
         });
 
+    
+        if (global.io) {
+            if (roomId) {
+                global.io.to(roomId).emit("tryOnCompleted", {
+                    resultImage: finalResultUpload.secure_url,
+                    byUser: user.name
+                });
+            } else {
+                global.io.emit("tryOnCompleted", { resultImage: finalResultUpload.secure_url });
+            }
+
+        
+            global.activeRequests = Math.max(0, global.activeRequests - 1); 
+            global.io.emit("admin:updateAnalytics", { 
+                type: "TRYON_SUCCESS", 
+                queueLength: global.activeRequests,
+                totalTryOns: 1
+            });
+        }
+        
         res.status(200).json(newTryOn);
 
     } catch (error) {
         console.error("TryOn Error:", error);
-        res.status(500).json({
-            message: "AI Processing Failed",
-            error: error.message
-        });
+
+        if (global.io) {
+            global.activeRequests = Math.max(0, (global.activeRequests || 1) - 1);
+            global.io.emit("admin:updateAnalytics", { 
+                type: "TRYON_ERROR", 
+                queueLength: global.activeRequests 
+            });
+
+            global.io.emit("admin:errorAlert", {
+                user: req.user ? req.user.name : "Unknown",
+                error: error.message,
+                time: new Date()
+            });
+        }
+
+        res.status(500).json({ message: "AI Processing Failed", error: error.message });
     }
 };
 

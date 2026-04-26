@@ -11,6 +11,7 @@ import { API } from '@/lib/axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useCart } from '@/contexts/CartContext';
+import io from "socket.io-client";
 
 function StarRating({ rating, interactive = false, value = 0, onChange }) {
   const [hovered, setHovered] = useState(0);
@@ -54,6 +55,9 @@ export default function ProductDetailPage() {
   const [reviewComment, setReviewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const [resultImage, setResultImage] = useState(null);
+  const [tryOnLoading, setTryOnLoading] = useState(false);
+
   const loadProduct = async () => {
     setLoading(true);
     try {
@@ -67,7 +71,48 @@ export default function ProductDetailPage() {
     }
   };
 
+
+
+
+    useEffect(() => {
+      const socket = io("http://localhost:5000");
+
+      socket.on("tryOnCompleted", (data) => {
+        setResultImage(data.resultImage);
+        setTryOnLoading(false);
+      });
+
+      socket.on("tryOnCount", (data) => {
+        console.log("🔥 Count:", data.count);
+      });
+
+      return () => socket.disconnect();
+    }, []);
+
+
   useEffect(() => { if (id) loadProduct(); }, [id]);
+
+
+const handleTryOn = async () => {
+  if (!user) {
+    toast.error("Please login first");
+    return;
+  }
+
+  setTryOnLoading(true);
+
+  await fetch("http://localhost:5000/api/try-on", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      userId: user._id,
+      productId: product._id
+    })
+  });
+};
+
 
   const handleAddToCart = async () => {
     if (!user) { router.push('/login'); return; }
@@ -208,6 +253,16 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
                 <div className="flex gap-3">
+
+                  //Ahmed
+                  <button
+                    onClick={handleTryOn}
+                    className="px-4 py-3.5 bg-blue-600 text-white rounded-xl hover:opacity-90 transition"
+                  >
+                    Try On 👕
+                  </button>
+
+
                   <button onClick={handleAddToCart} className="flex-1 py-3.5 text-sm font-medium tracking-widest uppercase bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all">
                     Add to Cart
                   </button>
@@ -217,6 +272,12 @@ export default function ProductDetailPage() {
                     </svg>
                   </button>
                 </div>
+                  // Try-On Result
+                  {tryOnLoading && <p>Processing... ⏳</p>}
+                  {resultImage && (
+                    <img src={resultImage} className="w-64 mt-4" />
+                  )}
+
               </div>
             )}
           </motion.div>

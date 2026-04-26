@@ -1,5 +1,7 @@
 require('dotenv').config();
 
+// import roomRoutes from "./routes/roomRoutes.js";
+const roomRoutes = require('./routes/roomRoutes');
 const express = require('express');
 const connectDB = require('./config/db');
 const colors = require('colors');
@@ -15,6 +17,7 @@ const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger');
 const morgan = require('morgan');
+const os = require('os-utils');
 
 console.log('🔍 Debug: Starting server initialization');
 console.log('Current directory:', process.cwd());
@@ -23,6 +26,7 @@ console.log('MONGO_URI exists:', !!process.env.MONGO_URI);
 console.log('MONGO_URI first chars:', process.env.MONGO_URI ? process.env.MONGO_URI.substring(0, 20) + '...' : 'not set');
 
 let dbConnected = false;
+let activeRequests = 0;
 
 if (process.env.NODE_ENV !== 'test') {
     connectDB()
@@ -37,6 +41,57 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 const app = express();
+const http = require("http").createServer(app);
+
+const io = require("socket.io")(http, {
+  cors: {
+    origin: "*"
+  }
+});
+
+global.io = io;
+
+setInterval(() => {
+    os.cpuUsage((v) => {
+        io.emit("admin:serverStats", {
+            cpu: (v * 100).toFixed(2),
+            ram: (100 - (os.freememPercentage() * 100)).toFixed(2),
+            uptime: Math.floor(os.sysUptime() / 60)
+        });
+    });
+}, 5000);
+
+io.on("connection", (socket) => {
+    console.log(`⚡ User Connected: ${socket.id}`);
+
+    socket.on("join_session", (roomId) => {
+        socket.join(roomId);
+        console.log(`👥 User ${socket.id} joined room: ${roomId}`);
+        
+    });
+
+    socket.on("ai_request_started", () => {
+        activeRequests++;
+        io.emit("admin:queueUpdate", { queueLength: activeRequests });
+    });
+
+    socket.on("ai_request_finished", () => {
+        if(activeRequests > 0) activeRequests--;
+        io.emit("admin:queueUpdate", { queueLength: activeRequests });
+    });
+
+    socket.on("send_feedback", (data) => {
+        // data: { roomId, user, type: 'like' | 'comment', message }
+        if (data.roomId) {
+            socket.to(data.roomId).emit("receive_feedback", data);
+        }
+    });
+
+    socket.on("disconnect", () => {
+        console.log("❌ User disconnected");
+    });
+});
+
 
 app.use(express.json());
 if (process.env.NODE_ENV === 'development') {
@@ -47,7 +102,7 @@ app.use(cors({
     origin: process.env.NODE_ENV === 'production'
         ? [process.env.FRONTEND_URL || 'https://frontend.vercel.app'].filter(Boolean)
         : 'http://localhost:3000',
-    credentials: true
+          credentials: true
 }));
 
 app.get('/', (req, res) => {
@@ -75,6 +130,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/try-on', require('./routes/tryOnRoutes'));
+app.use("/api/rooms", roomRoutes);
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     explorer: true,
@@ -90,8 +146,8 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
-    app.listen(PORT, () => {
-        console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`.yellow.bold);
+    http.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
     });
 }
 
