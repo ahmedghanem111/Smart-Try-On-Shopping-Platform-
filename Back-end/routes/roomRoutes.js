@@ -7,11 +7,16 @@ const { protect } = require('../middleware/authMiddleware');
 /**
  * @swagger
  * /api/rooms/create:
- * post:
- * summary: Create a new shared session room
- * tags: [Rooms]
- * security:
- * - bearerAuth: []
+ *   post:
+ *     summary: Create a new shared session room
+ *     tags: [Rooms]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Room created successfully
+ *       400:
+ *         description: Not authorized
  */
 router.post('/create', protect, createRoom);
 

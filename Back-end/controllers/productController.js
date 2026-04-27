@@ -88,6 +88,15 @@ const createProduct = asyncHandler(async (req, res) => {
     });
 
     const createdProduct = await product.save();
+
+    if (global.io) {
+        global.io.emit('inventory_alert', {
+            type: 'NEW_ARRIVAL',
+            message: `New Arrival: ${createdProduct.name} is now available!`,
+            productId: createdProduct._id
+        });
+    }
+
     res.status(201).json(createdProduct);
 });
 
@@ -97,16 +106,35 @@ const updateProduct = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id);
 
     if (product) {
+        const oldStock = product.countInStock;
         product.name = name || product.name;
         product.price = price || product.price;
         product.description = description || product.description;
         product.image = image || product.image;
         product.brand = brand || product.brand;
         product.category = category || product.category;
-        product.countInStock = countInStock || product.countInStock;
+        product.countInStock = countInStock !== undefined ? countInStock : product.countInStock;
         product.glbModel = glbModel || product.glbModel;
+        product.user = product.user || req.user._id;
 
         const updatedProduct = await product.save();
+
+        if (global.io) {
+            if (updatedProduct.countInStock === 0 && oldStock > 0) {
+                global.io.emit('inventory_alert', {
+                    type: 'SOLD_OUT',
+                    message: `High Demand! ${updatedProduct.name} just sold out!`,
+                    productId: updatedProduct._id
+                });
+            } else if (updatedProduct.countInStock < 5 && updatedProduct.countInStock > 0) {
+                global.io.emit('inventory_alert', {
+                    type: 'LOW_STOCK',
+                    message: `Hurry! Only ${updatedProduct.countInStock} left of ${updatedProduct.name}`,
+                    productId: updatedProduct._id
+                });
+            }
+        }
+
         res.json(updatedProduct);
     } else {
         res.status(404);

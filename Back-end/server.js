@@ -45,7 +45,10 @@ const http = require("http").createServer(app);
 
 const io = require("socket.io")(http, {
   cors: {
-    origin: "*"
+      origin: process.env.NODE_ENV === 'production'
+          ? "https://frontend.vercel.app"
+          : "http://localhost:3000",
+      methods: ["GET", "POST"]
   }
 });
 
@@ -89,6 +92,27 @@ io.on("connection", (socket) => {
 
     socket.on("disconnect", () => {
         console.log("❌ User disconnected");
+    });
+
+    // Feature -> Support Chat
+    socket.on("join_chat", (userId) => {
+        socket.join(userId);
+        console.log(`💬 User ${userId} is now online for support`);
+    });
+
+    socket.on("send_support_message", (arg) => {
+        let data = typeof arg === 'string' ? JSON.parse(arg) : arg;
+
+        console.log('--- New Message Event ---');
+        console.log('Data Received:', data);
+
+        if (data && data.receiverId) {
+            const messageData = { ...data, timestamp: new Date() };
+            io.to(data.receiverId).emit("receive_support_message", messageData);
+            console.log('✅ Emit command executed to room:', data.receiverId);
+        } else {
+            console.log('⚠️ Message ignored: Missing receiverId. Type of data is:', typeof data);
+        }
     });
 });
 
@@ -145,10 +169,8 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
-    http.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    });
-}
+http.listen(PORT, () => {
+    console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`.cyan.bold);
+});
 
 module.exports = app;

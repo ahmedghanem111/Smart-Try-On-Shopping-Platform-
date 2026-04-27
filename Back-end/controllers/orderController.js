@@ -36,8 +36,27 @@ const addOrderItems = asyncHandler(async (req, res) => {
             if (product) {
                 product.countInStock -= item.qty;
                 await product.save();
+
+                if (product.countInStock === 0) {
+                    global.io.emit('inventory_alert', {
+                        type: 'SOLD_OUT',
+                        message: `High Demand! ${product.name} just sold out!`,
+                        productId: product._id
+                    });
+                } else if (product.countInStock < 5) {
+                    global.io.emit('inventory_alert', {
+                        type: 'LOW_STOCK',
+                        message: `Only ${product.countInStock} left of ${product.name}!`,
+                        productId: product._id
+                    });
+                }
             }
         }
+
+        global.io.emit('admin:newOrder', {
+            orderId: createdOrder._id,
+            totalPrice: createdOrder.totalPrice
+        });
 
         res.status(201).json(createdOrder);
     }
@@ -87,6 +106,12 @@ const updateOrderToPaid = asyncHandler(async (req, res) => {
         order.isPaid = true;
         order.paidAt = Date.now();
         const updatedOrder = await order.save();
+
+        global.io.emit('admin:revenueUpdate', {
+            amount: updatedOrder.totalPrice,
+            timestamp: updatedOrder.paidAt
+        });
+
         res.json(updatedOrder);
     } else {
         res.status(404);
