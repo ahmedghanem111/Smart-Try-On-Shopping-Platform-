@@ -6,11 +6,13 @@ import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
 import Model3D from '@/components/ui/Model3D';
+import WishlistHeart from '@/components/ui/WishlistHeart';
 import { useGLTF } from '@react-three/drei';
 import { API } from '@/lib/axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useCart } from '@/contexts/CartContext';
+import { useWishlist } from '@/contexts/WishlistContext';
 import io from "socket.io-client";
 
 function StarRating({ rating, interactive = false, value = 0, onChange }) {
@@ -46,6 +48,7 @@ export default function ProductDetailPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { addToCart } = useCart();
+  const { toggleWishlist } = useWishlist();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -125,12 +128,15 @@ const handleTryOn = async () => {
   };
 
   const handleWishlist = async () => {
-    if (!user) { toast.error('Please login to save items.'); return; }
+    if (!user) { 
+      toast.error('Please login to save items.'); 
+      return; 
+    }
     try {
-      await API.post('/api/wishlist', { productId: product._id });
-      toast.success('Added to wishlist!');
+      await toggleWishlist(product._id);
+      toast.success('Wishlist updated!');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to add to wishlist.');
+      toast.error('Failed to update wishlist.');
     }
   };
 
@@ -266,11 +272,9 @@ const handleTryOn = async () => {
                   <button onClick={handleAddToCart} className="flex-1 py-3.5 text-sm font-medium tracking-widest uppercase bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all">
                     Add to Cart
                   </button>
-                  <button onClick={handleWishlist} className="px-4 py-3.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" aria-label="Add to wishlist">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                  </button>
+                  <div className="px-4 py-3.5 border border-slate-300 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center">
+                    <WishlistHeart productId={product._id} size="lg" />
+                  </div>
                 </div>
                   // Try-On Result
                   {tryOnLoading && <p>Processing... ⏳</p>}
