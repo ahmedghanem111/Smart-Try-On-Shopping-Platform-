@@ -268,6 +268,20 @@ const handleTryOn = async () => {
                     Try On 👕
                   </button>
 
+                  {/* Live camera try-on — navigates to /try-on/[id] room */}
+                  {product.glbModel && ['Clothes', 'Accessories'].includes(product.category) && (
+                    <button
+                      onClick={() => router.push(`/try-on/${product._id}`)}
+                      className="flex items-center gap-2 px-4 py-3.5 bg-violet-600 text-white text-sm font-medium rounded-xl hover:opacity-90 active:scale-[0.98] transition-all"
+                    >
+                      {/* Camera icon */}
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                      </svg>
+                      Try Live
+                    </button>
+                  )}
 
                   <button onClick={handleAddToCart} className="flex-1 py-3.5 text-sm font-medium tracking-widest uppercase bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl hover:opacity-90 active:scale-[0.98] transition-all">
                     Add to Cart
