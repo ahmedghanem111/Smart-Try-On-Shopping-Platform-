@@ -1,9 +1,11 @@
 """
-Landmark Smoother — Fix 1
+Landmark Smoother
 Keeps a rolling buffer of the last N frames of landmark positions
 and returns the average. Eliminates jitter from raw MediaPipe output.
 
-Used by both body and face trackers.
+Supports two landmark formats:
+  - Tuple format: {"left_shoulder": (x, y), ...}  ← used by body_tracker
+  - Dict format:  {"left_eye": {"x": 265, "y": 200, "z": -0.034}, ...}  ← used by face_tracker
 """
 
 from collections import deque
@@ -15,41 +17,49 @@ class LandmarkSmoother:
         """
         buffer_size → how many past frames to average.
         5 = smooth but still responsive to real movement.
-        Higher = smoother but more lag when moving fast.
         """
         self.buffer_size = buffer_size
-        # One deque per landmark key, created on first use
         self._buffers: dict[str, deque] = {}
 
     def smooth(self, landmarks: dict | None) -> dict | None:
         """
-        Accept a landmarks dict like:
-          {"left_shoulder": (x, y), "right_shoulder": (x, y), ...}
+        Accept landmarks in either format and return smoothed version.
 
-        Returns the same dict but with each point averaged across
-        the last buffer_size frames. Returns None if input is None.
+        Tuple format: {"key": (x, y)}
+          → buffers (x, y), returns (x, y)
 
-        On the first few frames the buffer isn't full yet — we average
-        whatever we have so the shirt appears immediately without waiting.
+        Dict format:  {"key": {"x": int, "y": int, "z": float}}
+          → buffers (x, y, z), returns {"x": int, "y": int, "z": float}
+
+        Returns None if input is None.
         """
         if landmarks is None:
-            # Don't clear the buffer — person may just be briefly occluded.
-            # Return None so the caller knows nothing was detected.
             return None
 
         smoothed = {}
-        for key, (x, y) in landmarks.items():
+
+        for key, val in landmarks.items():
             if key not in self._buffers:
                 self._buffers[key] = deque(maxlen=self.buffer_size)
 
-            self._buffers[key].append((x, y))
-
-            # Average all stored positions for this landmark
-            arr = np.array(self._buffers[key])
-            smoothed[key] = (int(arr[:, 0].mean()), int(arr[:, 1].mean()))
+            # ── Detect format ─────────────────────────────────────────────────
+            if isinstance(val, dict):
+                # Dict format: {x, y, z}
+                self._buffers[key].append((val["x"], val["y"], val["z"]))
+                arr = np.array(self._buffers[key])
+                smoothed[key] = {
+                    "x": int(arr[:, 0].mean()),
+                    "y": int(arr[:, 1].mean()),
+                    "z": round(float(arr[:, 2].mean()), 4),
+                }
+            else:
+                # Tuple format: (x, y)
+                self._buffers[key].append((val[0], val[1]))
+                arr = np.array(self._buffers[key])
+                smoothed[key] = (int(arr[:, 0].mean()), int(arr[:, 1].mean()))
 
         return smoothed
 
     def reset(self):
-        """Clear all buffers — call this if the person leaves the frame."""
+        """Clear all buffers."""
         self._buffers.clear()

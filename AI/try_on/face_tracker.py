@@ -1,11 +1,20 @@
 """
-Phase 3 — Face Tracker (updated for Phase 5 improvements)
+Phase 3 — Face Tracker (updated for Phase 5 + 3D improvements)
 Uses MediaPipe FaceLandmarker (Tasks API) to detect face landmarks in real time.
 
 Updated landmarks for improved glasses placement:
   - Eye centers (inner + outer midpoints)
   - Nose bridge MID (168) — better vertical anchor than top (6)
   - Face edges (234, 454) — temple anchor points, encode head rotation
+  - Arm anchors (162, 93, 389, 323) — hinge and ear tip for glasses arms
+
+Z coordinate added to every landmark:
+  MediaPipe gives a Z value for each face landmark representing approximate depth.
+  Z=0 is the face surface plane, negative = further from camera (behind face),
+  positive = closer to camera (in front of face).
+  The frontend uses this to tilt the 3D glasses model correctly when the
+  person turns their head — without Z we only know left/right/up/down,
+  not how far each point is from the camera.
 """
 
 import os
@@ -22,13 +31,12 @@ RIGHT_EYE_INNER   = 362
 RIGHT_EYE_OUTER   = 263
 NOSE_BRIDGE_TOP   = 6      # very top of nose bridge
 NOSE_BRIDGE_MID   = 168    # middle of nose bridge — better anchor for glasses
-LEFT_FACE_EDGE    = 234    # leftmost face point — left cheekbone (2D frame width)
-RIGHT_FACE_EDGE   = 454    # rightmost face point — right cheekbone (2D frame width)
-
-LEFT_ARM_HINGE    = 162    # left temple — arm hinge point
-LEFT_EAR_TIP      = 93     # left tragus — arm hooks here behind ear
-RIGHT_ARM_HINGE   = 389    # right temple — arm hinge point
-RIGHT_EAR_TIP     = 323    # right tragus — arm hooks here behind ear
+LEFT_FACE_EDGE    = 234    # leftmost face point — left cheekbone
+RIGHT_FACE_EDGE   = 454    # rightmost face point — right cheekbone
+LEFT_ARM_HINGE    = 162    # left temple — where arm leaves the frame
+LEFT_EAR_TIP      = 93     # left tragus — where arm hooks behind ear
+RIGHT_ARM_HINGE   = 389    # right temple — where arm leaves the frame
+RIGHT_EAR_TIP     = 323    # right tragus — where arm hooks behind ear
 # ─────────────────────────────────────────────────────────────────────────────
 
 _MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "face_landmarker.task")
@@ -67,17 +75,34 @@ class FaceTracker:
         """
         Extract landmarks needed for glasses placement.
 
-        Returns:
-          left_eye        → center of left eye (inner+outer midpoint)
-          right_eye       → center of right eye
-          nose_bridge     → mid nose bridge — glasses vertical anchor
-          left_face_edge  → leftmost face point — left temple anchor
-          right_face_edge → rightmost face point — right temple anchor
+        Each landmark is now a dict with x, y (pixels) AND z (depth):
+          {
+            "left_eye":        {"x": 265, "y": 200, "z": -0.034},
+            "right_eye":       {"x": 375, "y": 200, "z": -0.031},
+            "nose_bridge":     {"x": 320, "y": 220, "z":  0.012},
+            "left_face_edge":  {"x": 160, "y": 210, "z": -0.082},
+            "right_face_edge": {"x": 480, "y": 210, "z": -0.079},
+            "left_arm_hinge":  {"x": 180, "y": 208, "z": -0.071},
+            "left_ear_tip":    {"x": 130, "y": 230, "z": -0.120},
+            "right_arm_hinge": {"x": 460, "y": 208, "z": -0.068},
+            "right_ear_tip":   {"x": 510, "y": 230, "z": -0.115},
+          }
 
-        The face_edge points are critical: they encode head rotation naturally.
-        When the face turns left, the right face_edge moves closer to the eyes
-        and the left face_edge moves further — exactly what we need for
-        perspective-correct glasses rendering.
+        Z coordinate meaning:
+          - MediaPipe normalizes Z relative to the face size
+          - Z ≈ 0   → on the face surface plane
+          - Z < 0   → behind/into the face (ears, sides of head)
+          - Z > 0   → in front of the face (tip of nose)
+          - The ear tips have large negative Z because they are
+            on the SIDE of the head, far from the camera
+
+        The frontend uses Z to:
+          1. Compute the glasses model's Y rotation (head turn left/right)
+             by comparing Z of left_face_edge vs right_face_edge
+          2. Correctly position the arm endpoints in 3D space
+          3. Determine how much perspective foreshortening to apply
+
+        Returns None if no face is detected.
         """
         if not results or not results.face_landmarks:
             return None
@@ -85,30 +110,48 @@ class FaceTracker:
         lm = results.face_landmarks[0]
 
         def to_pixel(idx):
-            return (
-                int(lm[idx].x * frame_width),
-                int(lm[idx].y * frame_height),
-            )
+            """
+            Convert one landmark to pixel x/y + raw z depth.
+            x and y are multiplied by frame dimensions to get pixel coords.
+            z is kept as the raw MediaPipe value (not scaled by frame size)
+            because z is already normalized relative to face size.
+            """
+            return {
+                "x": int(lm[idx].x * frame_width),
+                "y": int(lm[idx].y * frame_height),
+                "z": round(float(lm[idx].z), 4),   # 4 decimal places is enough
+            }
 
-        def midpoint(a, b):
-            return ((a[0] + b[0]) // 2, (a[1] + b[1]) // 2)
-
-        left_eye  = midpoint(to_pixel(LEFT_EYE_INNER),  to_pixel(LEFT_EYE_OUTER))
-        right_eye = midpoint(to_pixel(RIGHT_EYE_INNER), to_pixel(RIGHT_EYE_OUTER))
+        def midpoint_3d(a_idx, b_idx):
+            """
+            Average x, y, z of two landmarks.
+            Used for eye centers — we want the center of inner and outer eye corners
+            in all 3 dimensions.
+            """
+            a = lm[a_idx]
+            b = lm[b_idx]
+            return {
+                "x": int(((a.x + b.x) / 2) * frame_width),
+                "y": int(((a.y + b.y) / 2) * frame_height),
+                "z": round(float((a.z + b.z) / 2), 4),
+            }
 
         return {
-            "left_eye":        left_eye,
-            "right_eye":       right_eye,
-            "nose_bridge":     to_pixel(NOSE_BRIDGE_MID),   # 168 — better than 6
+            # ── Core glasses anchors ──────────────────────────────────────────
+            "left_eye":        midpoint_3d(LEFT_EYE_INNER,  LEFT_EYE_OUTER),
+            "right_eye":       midpoint_3d(RIGHT_EYE_INNER, RIGHT_EYE_OUTER),
+            "nose_bridge":     to_pixel(NOSE_BRIDGE_MID),
             "left_face_edge":  to_pixel(LEFT_FACE_EDGE),
             "right_face_edge": to_pixel(RIGHT_FACE_EDGE),
-            # ── Glasses arm anchors ───────────────────────────────────────────
-            # Two points per side so the frontend knows where the arm starts
-            # (hinge, at the temple) and where it ends (ear_tip, at the tragus).
-            "left_arm_hinge":  to_pixel(LEFT_ARM_HINGE),    # 162
-            "left_ear_tip":    to_pixel(LEFT_EAR_TIP),      # 93
-            "right_arm_hinge": to_pixel(RIGHT_ARM_HINGE),   # 389
-            "right_ear_tip":   to_pixel(RIGHT_EAR_TIP),     # 323
+            # ── Arm anchors ───────────────────────────────────────────────────
+            # hinge = where the arm leaves the frame (at the temple)
+            # ear_tip = where the arm ends (at the tragus, behind ear)
+            # Z difference between hinge and ear_tip tells the frontend
+            # how far the arm needs to extend back in 3D space
+            "left_arm_hinge":  to_pixel(LEFT_ARM_HINGE),
+            "left_ear_tip":    to_pixel(LEFT_EAR_TIP),
+            "right_arm_hinge": to_pixel(RIGHT_ARM_HINGE),
+            "right_ear_tip":   to_pixel(RIGHT_EAR_TIP),
         }
 
     def draw_mesh(self, frame, results):
@@ -124,44 +167,52 @@ class FaceTracker:
     def draw_key_points(self, frame, landmarks):
         """
         Draw our key points as colored circles.
+
+        Note: landmarks are now dicts with x/y/z keys, not tuples.
+        We extract (x, y) for drawing — z is not visible in 2D.
+
         Color coding:
           Cyan    = eye centers       (lens anchors)
           Magenta = nose bridge       (vertical anchor)
           Yellow  = face edges        (temple anchors)
+          Orange  = arm hinges        (where arm starts)
+          Red     = ear tips          (where arm ends)
         """
         if not landmarks:
             return frame
 
         colors = {
-            "left_eye":        (255, 255, 0),    # Cyan
-            "right_eye":       (255, 255, 0),    # Cyan
-            "nose_bridge":     (255, 0, 255),    # Magenta
-            "left_face_edge":  (0,   255, 255),  # Yellow
-            "right_face_edge": (0,   255, 255),  # Yellow
-            # Arm anchors — Orange so they stand out from the existing points
-            "left_arm_hinge":  (0,   165, 255),  # Orange
-            "left_ear_tip":    (0,   100, 255),  # Dark orange
-            "right_arm_hinge": (0,   165, 255),  # Orange
-            "right_ear_tip":   (0,   100, 255),  # Dark orange
+            "left_eye":        (255, 255, 0),
+            "right_eye":       (255, 255, 0),
+            "nose_bridge":     (255, 0, 255),
+            "left_face_edge":  (0, 255, 255),
+            "right_face_edge": (0, 255, 255),
+            "left_arm_hinge":  (0, 165, 255),
+            "right_arm_hinge": (0, 165, 255),
+            "left_ear_tip":    (0, 0, 255),
+            "right_ear_tip":   (0, 0, 255),
         }
 
-        for name, point in landmarks.items():
-            cv2.circle(frame, point, 6, colors[name], -1)
-            cv2.circle(frame, point, 6, (0, 0, 0), 1)
-            cv2.putText(frame, name.replace("_", " "),
-                        (point[0] + 8, point[1]),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.32, (255, 255, 255), 1)
+        for name, lm in landmarks.items():
+            # Extract pixel point — landmarks are now dicts
+            pt = (lm["x"], lm["y"])
+            cv2.circle(frame, pt, 6, colors[name], -1)
+            cv2.circle(frame, pt, 6, (0, 0, 0), 1)
+            # Show name and Z value for debugging
+            label = f"{name.replace('_', ' ')} z={lm['z']:.3f}"
+            cv2.putText(frame, label, (pt[0] + 8, pt[1]),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.28, (255, 255, 255), 1)
+
+        def pt(name):
+            return (landmarks[name]["x"], landmarks[name]["y"])
 
         # Eye line
-        cv2.line(frame, landmarks["left_eye"], landmarks["right_eye"], (255, 255, 0), 2)
-        # Temple line (cheekbone width — used for 2D frame sizing)
-        cv2.line(frame, landmarks["left_face_edge"], landmarks["right_face_edge"],
-                 (0, 255, 255), 1)
-        # Arm lines — hinge → ear tip, one per side
-        cv2.line(frame, landmarks["left_arm_hinge"],  landmarks["left_ear_tip"],
-                 (0, 165, 255), 2)
-        cv2.line(frame, landmarks["right_arm_hinge"], landmarks["right_ear_tip"],
-                 (0, 165, 255), 2)
+        cv2.line(frame, pt("left_eye"), pt("right_eye"), (255, 255, 0), 2)
+        # Face edge line (temple width)
+        cv2.line(frame, pt("left_face_edge"), pt("right_face_edge"), (0, 255, 255), 1)
+        # Arm lines: hinge → ear tip
+        cv2.line(frame, pt("left_arm_hinge"),  pt("left_ear_tip"),  (0, 165, 255), 2)
+        cv2.line(frame, pt("right_arm_hinge"), pt("right_ear_tip"), (0, 165, 255), 2)
 
         return frame
 

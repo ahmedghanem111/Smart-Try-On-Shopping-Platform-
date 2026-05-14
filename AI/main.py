@@ -453,8 +453,9 @@ def glasses_landmarks():
             "fps":          fps,
         })
 
-    # Convert tuples to plain lists so JSON serialises cleanly: [x, y]
-    landmarks_out = {key: list(pt) for key, pt in smooth_lm.items()}
+    # Landmarks are now dicts {"x": int, "y": int, "z": float} — pass through directly.
+    # (The old list(pt) conversion was for tuple landmarks and broke dict landmarks.)
+    landmarks_out = smooth_lm
 
     return jsonify({
         "success":      True,
