@@ -1,28 +1,37 @@
 /**
- * landmarkUtils.js — with Z depth support
+ * landmarkUtils.js
  *
- * Converts Flask landmark pixel coordinates + Z depth into Three.js transforms.
+ * Converts Flask landmark pixel coordinates + Z depth into Three.js world-space.
  *
- * Landmark format from Flask (updated):
- *   Each landmark is now { x, y, z } instead of [x, y]
- *   x, y = pixel coordinates (origin top-left, y increases downward)
- *   z     = MediaPipe depth value, normalized to face size
- *             ~0   = face surface plane
- *             < 0  = behind face (ears, temples — negative Z = further back)
- *             > 0  = in front of face (nose tip)
+ * Coordinate systems
+ * ──────────────────
+ * Flask frame (what MediaPipe sees):
+ *   - The capture canvas is drawn MIRRORED (ctx.scale(-1,1)) before sending to Flask
+ *   - So Flask landmarks are already in "mirror space" — matching what the user sees
+ *   - Origin top-left, x rightward, y downward
  *
- * How Z is used for glasses:
- *   The Y rotation of the glasses model encodes how much the head is turned.
- *   We compute this from the Z difference between left and right face edges:
- *     - Face forward: left_z ≈ right_z (both at same depth)
- *     - Face turned right: left_z becomes more negative (left side goes back)
- *     - Face turned left: right_z becomes more negative
- *   This gives us the head yaw angle without needing a full 3D pose estimate.
+ * Three.js world space (camera at z=5, fov=50):
+ *   - Origin at scene center
+ *   - x rightward, y UPWARD (opposite of image), z toward viewer
+ *
+ * Conversion:
+ *   nx = x / frameWidth  - 0.5   → [-0.5, +0.5], 0 = center
+ *   ny = y / frameHeight - 0.5   → [-0.5, +0.5], 0 = center
+ *   worldX =  nx * worldWidth    (no negation — frame is already mirrored)
+ *   worldY = -ny * worldHeight   (flip Y: image down → Three.js up)
+ *
+ * IMPORTANT: canvasWidth/canvasHeight passed here must be the THREE.JS CANVAS
+ * dimensions (screen size), NOT the capture canvas dimensions.
+ * The Three.js camera frustum is based on the screen aspect ratio.
  */
 
 const CAMERA_Z   = 5;
-const CAMERA_FOV = 50;   // degrees — must match TryOnCamera.jsx Canvas camera
+const CAMERA_FOV = 50;  // degrees — must match the Canvas camera fov in TryOnCamera.jsx
 
+/**
+ * Compute the visible world width at z=0 for the given canvas aspect ratio.
+ * This is the key function that maps pixel space to Three.js world space.
+ */
 function computeWorldWidth(canvasWidth, canvasHeight) {
   const fovRad        = (CAMERA_FOV * Math.PI) / 180;
   const visibleHeight = 2 * Math.tan(fovRad / 2) * CAMERA_Z;
@@ -30,61 +39,73 @@ function computeWorldWidth(canvasWidth, canvasHeight) {
 }
 
 /**
- * Convert {x, y, z} landmark to Three.js world coords.
- * x is NEGATED to correct the double-mirror (CSS scaleX(-1) on video).
- * z is scaled for use as a Three.js Z offset.
+ * Convert a single {x, y, z} Flask landmark to Three.js world coords.
  *
- * @param {{ x, y, z }} lm        - landmark from Flask
- * @param {number} frameWidth
- * @param {number} frameHeight
- * @param {number} canvasWidth
- * @param {number} canvasHeight
- * @returns {{ x, y, z }}
+ * @param {{ x, y, z }} lm
+ * @param {number} frameWidth    - Flask frame width (what MediaPipe processed)
+ * @param {number} frameHeight   - Flask frame height
+ * @param {number} canvasWidth   - THREE.JS canvas width (screen pixels)
+ * @param {number} canvasHeight  - THREE.JS canvas height (screen pixels)
  */
 export function landmarkToWorld(lm, frameWidth, frameHeight, canvasWidth, canvasHeight) {
   const worldWidth  = computeWorldWidth(canvasWidth, canvasHeight);
-  const worldHeight = worldWidth * (frameHeight / frameWidth);
+  const worldHeight = worldWidth * (canvasHeight / canvasWidth);
 
-  const nx = lm.x / frameWidth  - 0.5;
-  const ny = lm.y / frameHeight - 0.5;
+  const nx =  lm.x / frameWidth  - 0.5;
+  const ny =  lm.y / frameHeight - 0.5;
 
   return {
-    x: -nx * worldWidth,    // negated: fix double-mirror
-    y: -ny * worldHeight,   // negated: image y-down → Three.js y-up
-    z:  lm.z * worldWidth,  // scale z same as x so units are consistent
+    x:  nx * worldWidth,    // no negation — capture canvas is already mirrored
+    y: -ny * worldHeight,   // flip Y: image y-down → Three.js y-up
+    z:  lm.z * worldWidth,  // z scaled to world units
   };
 }
 
 /**
- * Pixel distance between two landmarks → Three.js world units.
- * Uses only x/y (ignores z) — for measuring screen-space distances.
+ * Screen-space Euclidean distance between two landmarks → Three.js world units.
+ * Uses x/y only (ignores z) — measures the 2D projected distance.
+ *
+ * @param {number} canvasWidth  - THREE.JS canvas width
  */
 export function pixelDistanceToWorld(a, b, frameWidth, canvasWidth, canvasHeight) {
-  const dx        = a.x - b.x;
-  const dy        = a.y - b.y;
-  const pixelDist = Math.sqrt(dx * dx + dy * dy);
+  const dx         = a.x - b.x;
+  const dy         = a.y - b.y;
+  const pixelDist  = Math.sqrt(dx * dx + dy * dy);
   const worldWidth = computeWorldWidth(canvasWidth, canvasHeight);
   return (pixelDist / frameWidth) * worldWidth;
 }
 
 /**
- * Compute glasses model transform from face landmarks (with Z depth).
+ * computeGlassesTransform
+ *
+ * Converts face landmarks into the transform needed to place a 3D glasses GLB
+ * on the face in Three.js world space.
  *
  * Returns:
- *   position  { x, y, z }  — world-space center (eye midpoint)
- *   scale     number        — world-space glasses width (face edge to face edge)
- *   rotationZ number        — Z rotation in radians (head tilt left/right)
- *   rotationY number        — Y rotation in radians (head turn, from Z depth)
+ *   position  { x, y }   — world-space anchor point (between eyes and nose bridge)
+ *   scale     number      — world-space width from hinge to hinge
+ *   rotationZ number      — Z rotation in radians (head tilt)
+ *   rotationY number      — Y rotation in radians (head turn, from Z depth)
  *
- * rotationY is the key new output — it makes the glasses model rotate
- * in 3D when the user turns their head, so the arms follow the ears.
+ * Anchor point:
+ *   Real glasses rest on the nose bridge, with lenses covering the eyes.
+ *   The correct anchor is NOT the eye midpoint (too high) and NOT the nose
+ *   bridge alone (too low). We blend: 50% eye midpoint + 50% nose bridge.
+ *   This puts the anchor right where the nose pads sit — the natural resting
+ *   point of glasses on a face.
  *
- * How rotationY is computed:
- *   MediaPipe z is normalized to face size. When the face turns right,
- *   the left face edge goes backward (z becomes more negative) and the
- *   right face edge comes forward (z becomes less negative).
- *   The difference left_z - right_z gives us the turn direction and amount.
- *   We scale by a factor to convert from MediaPipe z units to radians.
+ * Scale:
+ *   We use arm_hinge to arm_hinge (landmarks 162→389) as the frame width.
+ *   This is the distance between the two hinge points where the arms attach —
+ *   exactly the width of the glasses front frame.
+ *   face_edge (234→454) is the full cheekbone width — too wide, oversizes the model.
+ *
+ * rotationY (head turn):
+ *   MediaPipe Z depth: face_edge Z values encode head rotation.
+ *   When face turns right: left_face_edge.z decreases (goes back), right increases.
+ *   zDiff = lfe.z - rfe.z → positive = turned right → positive Y rotation.
+ *   Scale factor 6.0: MediaPipe z range ~0.15 for 90° turn → 0.15 * 6 ≈ 0.9 rad ≈ 52°.
+ *   Adjust if head turn looks too extreme or too subtle.
  */
 export function computeGlassesTransform(
   landmarks,
@@ -97,42 +118,44 @@ export function computeGlassesTransform(
   const rfe = landmarks.right_face_edge;
   const le  = landmarks.left_eye;
   const re  = landmarks.right_eye;
+  const nb  = landmarks.nose_bridge;
+  const lah = landmarks.left_arm_hinge;
+  const rah = landmarks.right_arm_hinge;
 
-  // ── Position: eye midpoint in world space ─────────────────────────────────
-  const eyeMid = {
-    x: (le.x + re.x) / 2,
-    y: (le.y + re.y) / 2,
-    z: (le.z + re.z) / 2,
+  // ── Anchor: blend of eye midpoint and nose bridge ─────────────────────────
+  // 50/50 blend puts the anchor at the nose pad position — where glasses rest.
+  // Increase nose_bridge weight (e.g. 0.4 eye + 0.6 nose) to move glasses down.
+  // Decrease it (e.g. 0.6 eye + 0.4 nose) to move glasses up.
+  const EYE_WEIGHT    = 0.5;
+  const BRIDGE_WEIGHT = 0.5;
+
+  const anchor = {
+    x: le.x * (EYE_WEIGHT / 2) + re.x * (EYE_WEIGHT / 2) + nb.x * BRIDGE_WEIGHT,
+    y: le.y * (EYE_WEIGHT / 2) + re.y * (EYE_WEIGHT / 2) + nb.y * BRIDGE_WEIGHT,
+    z: le.z * (EYE_WEIGHT / 2) + re.z * (EYE_WEIGHT / 2) + nb.z * BRIDGE_WEIGHT,
   };
-  const position = landmarkToWorld(eyeMid, frameWidth, frameHeight, canvasWidth, canvasHeight);
 
-  // ── Scale: face edge to face edge distance ────────────────────────────────
-  const scale = pixelDistanceToWorld(lfe, rfe, frameWidth, canvasWidth, canvasHeight);
+  const position = landmarkToWorld(anchor, frameWidth, frameHeight, canvasWidth, canvasHeight);
 
-  // ── Z rotation: head tilt (from x/y of face edges) ───────────────────────
+  // ── Scale: hinge-to-hinge distance = glasses frame width ──────────────────
+  // arm_hinge landmarks (162/389) are where the arms attach to the frame.
+  // This is the correct width for the front frame of the glasses.
+  const scale = pixelDistanceToWorld(lah, rah, frameWidth, canvasWidth, canvasHeight);
+
+  // ── rotationZ: head tilt from face-edge x/y angle ─────────────────────────
   const dx        = rfe.x - lfe.x;
   const dy        = rfe.y - lfe.y;
-  const rotationZ = Math.atan2(-dy, dx);   // negated dy: image y-down → Three.js y-up
+  const rotationZ = Math.atan2(-dy, dx);  // negate dy: image y-down → Three.js y-up
 
-  // ── Y rotation: head turn (from Z depth difference) ──────────────────────
-  // lfe.z and rfe.z are MediaPipe depth values (~0 = face surface)
-  // When face turns right: lfe.z decreases (left side goes back)
-  //                        rfe.z increases (right side comes forward)
-  // zDiff > 0 → face turned right → positive Y rotation (clockwise from above)
-  // zDiff < 0 → face turned left  → negative Y rotation
-  //
-  // Scale factor: MediaPipe z range is roughly -0.15 to +0.05 for a 90° turn.
-  // We want ~PI/2 radians (90°) for that range → scale ≈ PI/2 / 0.15 ≈ 10.5
-  // But glasses should be less extreme → use 6.0 for a natural look.
-  const zDiff    = lfe.z - rfe.z;    // positive = face turned right
-  const rotationY = zDiff * 6.0;    // tune this if head turn looks too extreme
+  // ── rotationY: head turn from Z depth difference ──────────────────────────
+  const zDiff     = lfe.z - rfe.z;
+  const rotationY = zDiff * 6.0;
 
   return { position, scale, rotationZ, rotationY };
 }
 
 /**
- * Compute shirt model transform from body measurements.
- * Unchanged — shirts don't need Z depth for basic placement.
+ * computeShirtTransform — unchanged, shirts don't need Z depth.
  */
 export function computeShirtTransform(
   measurements,
@@ -141,19 +164,20 @@ export function computeShirtTransform(
   canvasWidth,
   canvasHeight,
 ) {
-  const worldWidth = computeWorldWidth(canvasWidth, canvasHeight);
+  const worldWidth  = computeWorldWidth(canvasWidth, canvasHeight);
+  const worldHeight = worldWidth * (canvasHeight / canvasWidth);
 
   const nb = measurements.shoulder_mid;
-  const nx = nb[0] / frameWidth  - 0.5;
-  const ny = nb[1] / frameHeight - 0.5;
+  const nx =  nb[0] / frameWidth  - 0.5;
+  const ny =  nb[1] / frameHeight - 0.5;
 
   const position = {
-    x: -nx * worldWidth,
-    y: -ny * worldWidth * (frameHeight / frameWidth),
+    x:  nx * worldWidth,
+    y: -ny * worldHeight,
   };
 
   const scaleX   = (measurements.shoulder_width / frameWidth)  * worldWidth;
-  const scaleY   = (measurements.torso_height   / frameHeight) * worldWidth * (frameHeight / frameWidth);
+  const scaleY   = (measurements.torso_height   / frameHeight) * worldHeight;
   const rotation = -(measurements.torso_angle_deg * Math.PI) / 180;
 
   return { position, scaleX, scaleY, rotation };
