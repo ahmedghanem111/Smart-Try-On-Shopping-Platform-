@@ -101,14 +101,14 @@ const generateTryOn = async (req, res) => {
         }
 
         const user = await User.findById(req.user._id);
-        if (!user.height || !user.weight) {
-            if (global.io) global.activeRequests--;
-            return res.status(400).json({
-                success: false,
-                message: "Profile Incomplete",
-                error: "Please enter your height and weight in your profile."
-            });
-        }
+        // if (!user.height || !user.weight) {
+        //     if (global.io) global.activeRequests--;
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "Profile Incomplete",
+        //         error: "Please enter your height and weight in your profile."
+        //     });
+        // }
 
         // إبلاغ الأدمن إن المعالجة بدأت فعلياً
         if (global.io) {
