@@ -112,7 +112,7 @@ export default function Products() {
 
   const handleSelect = (index) => {
     setSelectedIdx(index);
-    const model = filtered[index]?.glbModel;
+    const model = products[index]?.glbModel;
     if (model) useGLTF.preload(model);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -262,7 +262,7 @@ export default function Products() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <AnimatePresence mode="popLayout">
-              {filtered.map((product, index) => {
+              {products.map((product, index) => {
                 const isSelected = selected?._id === product._id;
                 return (
                   <motion.div
