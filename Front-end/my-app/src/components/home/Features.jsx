@@ -27,7 +27,7 @@ const features = [
       'Overlay garments on your image',
       'Automatic scaling based on body shape'
     ],
-    image: '/f2.jpeg',
+    image: '/I2.png',
   },
   {
     id: 3,
@@ -39,7 +39,7 @@ const features = [
       'Zoom in to inspect fabric details',
       'Realistic visualization beyond static photos'
     ],
-    image: '/f3.png',
+    image: '/I4.png',
   },
   {
     id: 4,
@@ -51,7 +51,7 @@ const features = [
       'Minimize product returns',
       'Shop with greater confidence'
     ],
-    image: '/f4.png',
+    image: '/I6.png',
   }
 ]
 
