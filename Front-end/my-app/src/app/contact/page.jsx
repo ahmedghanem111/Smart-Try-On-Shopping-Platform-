@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { API } from '@/lib/axios'
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -13,6 +14,7 @@ export default function ContactPage() {
   })
   const [errors, setErrors] = useState({})
   const [submitted, setSubmitted] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [loading, setLoading] = useState(false)
 
   // Validate form
@@ -61,38 +63,35 @@ export default function ContactPage() {
   // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    // Validate form
+
     const newErrors = validateForm()
-    
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
       return
     }
 
     setLoading(true)
-    
+    setSubmitError('')
+
     try {
-      // Console log the form data
-      console.log('Contact Form Submitted:', {
-        timestamp: new Date().toISOString(),
-        ...formData
+      // Backend accepts: name, email, message
+      // Include subject in the message body since the endpoint doesn't have a subject field
+      await API.post('/api/users/contact', {
+        name: formData.name,
+        email: formData.email,
+        message: formData.subject
+          ? `Subject: ${formData.subject}\n\n${formData.message}`
+          : formData.message,
       })
 
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        subject: '',
-        message: '',
-      })
+      setFormData({ name: '', email: '', subject: '', message: '' })
       setErrors({})
       setSubmitted(true)
-
-      // Hide success message after 5 seconds
-      setTimeout(() => {
-        setSubmitted(false)
-      }, 5000)
+      setTimeout(() => setSubmitted(false), 5000)
+    } catch (err) {
+      setSubmitError(
+        err.response?.data?.message || 'Failed to send message. Please try again.'
+      )
     } finally {
       setLoading(false)
     }
@@ -293,6 +292,20 @@ export default function ContactPage() {
                     <>Send Message</>
                   )}
                 </button>
+
+                {/* API error feedback */}
+                {submitError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2"
+                  >
+                    <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-sm text-red-700 dark:text-red-400">{submitError}</p>
+                  </motion.div>
+                )}
               </div>
             </form>
           </motion.div>

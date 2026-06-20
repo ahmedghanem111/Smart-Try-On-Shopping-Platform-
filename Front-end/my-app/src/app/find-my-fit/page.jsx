@@ -4,6 +4,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { API } from "@/lib/axios";
 import { io } from "socket.io-client";
+import SupportChat from "@/components/ui/SupportChat";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -198,6 +199,94 @@ function GarmentPicker({ clothes, selectedProduct, onSelect, onClose, dark }) {
   );
 }
 
+function RoomChat({ messages, onSendComment, dark }) {
+  const [draft, setDraft]     = useState("");
+  const bottomRef             = useRef(null);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!draft.trim()) return;
+    onSendComment(draft);
+    setDraft("");
+  };
+
+  return (
+    <div className={`rounded-[2rem] border overflow-hidden flex flex-col ${dark ? "bg-slate-900/80 border-white/5" : "bg-white border-slate-100 shadow-sm"}`}>
+      {/* Header */}
+      <div className={`px-5 py-3.5 border-b flex items-center gap-2 ${dark ? "border-white/5" : "border-slate-100"}`}>
+        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+        <span className="text-[10px] font-black uppercase tracking-[0.4em] opacity-60">Room Chat</span>
+        {messages.length > 0 && (
+          <span className={`ml-auto text-[9px] font-bold px-2 py-0.5 rounded-full ${dark ? "bg-white/5 text-white/40" : "bg-slate-100 text-slate-400"}`}>
+            {messages.length}
+          </span>
+        )}
+      </div>
+
+      {/* Message log */}
+      <div className="flex-1 overflow-y-auto max-h-52 px-4 py-3 space-y-2.5">
+        {messages.length === 0 ? (
+          <p className="text-center text-[10px] opacity-20 uppercase tracking-widest py-6 font-bold">
+            No messages yet — say something!
+          </p>
+        ) : (
+          messages.map((msg) => (
+            <div key={msg.id} className={`flex gap-2 ${msg.self ? "flex-row-reverse" : ""}`}>
+              {/* Avatar */}
+              <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[9px] font-black uppercase ${msg.self ? "bg-blue-600 text-white" : dark ? "bg-white/10 text-white/60" : "bg-slate-100 text-slate-500"}`}>
+                {msg.user?.[0] || "?"}
+              </div>
+              {/* Bubble */}
+              <div className={`max-w-[75%] ${msg.self ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
+                {!msg.self && (
+                  <span className="text-[9px] font-bold opacity-40 uppercase tracking-wider px-1">{msg.user}</span>
+                )}
+                <div className={`px-3 py-2 rounded-2xl text-xs font-medium leading-relaxed ${
+                  msg.type === "reaction"
+                    ? dark ? "bg-white/5 text-white/60" : "bg-slate-50 text-slate-400"
+                    : msg.self
+                      ? "bg-blue-600 text-white"
+                      : dark ? "bg-white/8 text-white/90" : "bg-slate-50 text-slate-800"
+                }`}>
+                  {msg.text}
+                </div>
+                <span className="text-[9px] opacity-25 px-1">{msg.time}</span>
+              </div>
+            </div>
+          ))
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <form onSubmit={submit} className={`px-4 py-3 border-t flex gap-2 ${dark ? "border-white/5" : "border-slate-100"}`}>
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Type a comment…"
+          maxLength={200}
+          className={`flex-1 px-4 py-2.5 rounded-xl text-xs border outline-none transition-all ${dark ? "bg-white/5 border-white/10 focus:border-blue-500 placeholder:text-white/20" : "bg-slate-50 border-slate-200 focus:border-blue-400 placeholder:text-slate-300"}`}
+        />
+        <button
+          type="submit"
+          disabled={!draft.trim()}
+          className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white hover:bg-blue-500 disabled:opacity-30 transition-all flex-shrink-0"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function FindMyFitPage() {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -226,6 +315,7 @@ export default function FindMyFitPage() {
   const [showRoomModal, setShowRoomModal]     = useState(false);
   const [notifications, setNotifications]     = useState([]);
   const [queueLength, setQueueLength]         = useState(0);
+  const [messages, setMessages]               = useState([]);   // persistent chat log
 
   const addNotification = useCallback((text) => {
     const id = Date.now();
@@ -242,7 +332,23 @@ export default function FindMyFitPage() {
     socket.on("admin:updateAnalytics", ({ queueLength: q }) => { if (q !== undefined) setQueueLength(q); });
     socket.on("room:memberCount",      ({ count }) => setRoomMembers(count));
     socket.on("room:reaction",         ({ user: s, emoji }) => addNotification(`${s || "Someone"} reacted ${emoji}`));
-    socket.on("receive_feedback",      (data) => { if (data?.message) addNotification(`${data.user || "Someone"}: ${data.message}`); });
+    socket.on("receive_feedback",      (data) => {
+      if (!data?.message) return;
+      // Show toast for short reactions; add all to persistent chat log
+      if (data.type === "reaction") {
+        addNotification(`${data.user || "Someone"} reacted ${data.message}`);
+      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          id:   Date.now() + Math.random(),
+          user: data.user || "Someone",
+          text: data.message,
+          type: data.type || "comment",
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ]);
+    });
 
     socket.on("tryOnCompleted", ({ resultImage: img, byUser, requestId }) => {
       if (!img) return;
@@ -315,10 +421,27 @@ export default function FindMyFitPage() {
 
   const handleJoinRoom    = (id) => { socketRef.current?.emit("join_session", id); setRoomId(id); setShowRoomModal(false); addNotification(`Joined room ${id}`); };
   const handleCreateRoom  = ()   => { const id = generateRoomId(); socketRef.current?.emit("join_session", id); setRoomId(id); setShowRoomModal(false); addNotification(`Room ${id} created!`); };
-  const handleLeaveRoom   = ()   => { socketRef.current?.emit("leave_session", roomId); setRoomId(""); setRoomMembers(1); };
+  const handleLeaveRoom   = ()   => { socketRef.current?.emit("leave_session", roomId); setRoomId(""); setRoomMembers(1); setMessages([]); };
   const handleSendReaction = (emoji) => {
     if (!roomId) return;
     socketRef.current?.emit("send_feedback", { roomId, user: user?.name || "Guest", type: "reaction", emoji, message: emoji });
+  };
+  const handleSendComment = (text) => {
+    if (!roomId || !text.trim()) return;
+    const msg = { roomId, user: user?.name || "Guest", type: "comment", message: text.trim() };
+    socketRef.current?.emit("send_feedback", msg);
+    // Also show in own chat immediately (sender doesn't receive their own broadcast)
+    setMessages((prev) => [
+      ...prev,
+      {
+        id:   Date.now() + Math.random(),
+        user: user?.name || "You",
+        text: text.trim(),
+        type: "comment",
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        self: true,
+      },
+    ]);
   };
 
   const handleTryOn = async () => {
@@ -531,12 +654,23 @@ export default function FindMyFitPage() {
                 Room {roomId} — {roomMembers} {roomMembers === 1 ? "member" : "members"} online
               </div>
             )}
-          </div>
+
+            {/* Chat panel — only visible when inside a room */}
+            {roomId && (
+              <RoomChat
+                messages={messages}
+                onSendComment={handleSendComment}
+                dark={dark}
+              />
+            )}          </div>
         </div>
       </div>
 
       {pickerOpen    && <GarmentPicker clothes={clothes} selectedProduct={selectedProduct} onSelect={setSelectedProduct} onClose={() => setPickerOpen(false)} dark={dark} />}
       {showRoomModal && <JoinRoomModal onClose={() => setShowRoomModal(false)} onJoin={handleJoinRoom} onCreate={handleCreateRoom} dark={dark} />}
+
+      {/* Support chat — only on this page for non-admin users */}
+      <SupportChat />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { io } from 'socket.io-client'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
@@ -676,8 +677,209 @@ function OrdersTab() {
   )
 }
 
+// ─── SUPPORT TAB ─────────────────────────────────────────────────────────────
+
+function SupportTab({ adminId, adminName, conversations, setConversations, connected, socketRef }) {
+  const [selected, setSelected] = useState(null)
+  const [input, setInput] = useState('')
+  const messagesEndRef = useRef(null)
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [conversations, selected])
+
+  // When admin opens a conversation, clear unread count
+  const openConversation = (senderId) => {
+    setSelected(senderId)
+    setConversations((prev) => {
+      if (!prev[senderId]) return prev
+      return { ...prev, [senderId]: { ...prev[senderId], unread: 0 } }
+    })
+  }
+
+  const handleSend = useCallback(() => {
+    const text = input.trim()
+    if (!text || !selected || !socketRef.current) return
+
+    const payload = {
+      receiverId: selected,
+      senderId: adminId,
+      senderName: adminName,
+      message: text,
+    }
+
+    socketRef.current.emit('send_support_message', payload)
+
+    // Optimistically add to conversation
+    setConversations((prev) => {
+      const existing = prev[selected] || { senderName: selected, messages: [], unread: 0 }
+      return {
+        ...prev,
+        [selected]: {
+          ...existing,
+          messages: [
+            ...existing.messages,
+            { ...payload, timestamp: new Date().toISOString(), fromMe: true },
+          ],
+          lastTime: new Date().toISOString(),
+        },
+      }
+    })
+    setInput('')
+  }, [input, selected, adminId, adminName])
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  const sortedConvIds = Object.keys(conversations).sort((a, b) => {
+    const tA = new Date(conversations[a].lastTime || 0).getTime()
+    const tB = new Date(conversations[b].lastTime || 0).getTime()
+    return tB - tA
+  })
+
+  const selectedConv = selected ? conversations[selected] : null
+  const totalUnread = Object.values(conversations).reduce((sum, c) => sum + (c.unread || 0), 0)
+
+  return (
+    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+      {/* Panel header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+        <div className="flex items-center gap-3">
+          <h2 className="font-semibold text-slate-900 dark:text-white">Support Conversations</h2>
+          {totalUnread > 0 && (
+            <span className="px-2 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full">
+              {totalUnread}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-slate-400'}`} />
+          {connected ? 'Connected' : 'Disconnected'}
+        </div>
+      </div>
+
+      <div className="flex" style={{ height: '520px' }}>
+        {/* Left: conversation list */}
+        <div className="w-64 flex-shrink-0 border-r border-slate-100 dark:border-slate-700 overflow-y-auto">
+          {sortedConvIds.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm text-center px-4">
+              <svg className="w-8 h-8 mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              No messages yet
+            </div>
+          ) : (
+            sortedConvIds.map((senderId) => {
+              const conv = conversations[senderId]
+              const lastMsg = conv.messages[conv.messages.length - 1]
+              const isActive = selected === senderId
+              return (
+                <button
+                  key={senderId}
+                  onClick={() => openConversation(senderId)}
+                  className={`w-full text-left px-4 py-3.5 border-b border-slate-50 dark:border-slate-700/50 transition-colors
+                    ${isActive
+                      ? 'bg-slate-100 dark:bg-slate-700/60'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'}`}
+                >
+                  <div className="flex items-center justify-between mb-0.5">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white truncate max-w-[120px]">
+                      {conv.senderName}
+                    </p>
+                    {conv.unread > 0 && (
+                      <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold bg-blue-600 text-white rounded-full flex-shrink-0">
+                        {conv.unread}
+                      </span>
+                    )}
+                  </div>
+                  {lastMsg && (
+                    <p className="text-xs text-slate-400 truncate">
+                      {lastMsg.fromMe ? 'You: ' : ''}{lastMsg.message}
+                    </p>
+                  )}
+                  {conv.lastTime && (
+                    <p className="text-[10px] text-slate-300 dark:text-slate-600 mt-0.5">
+                      {new Date(conv.lastTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                </button>
+              )
+            })
+          )}
+        </div>
+
+        {/* Right: message thread */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {!selected ? (
+            <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+              Select a conversation
+            </div>
+          ) : (
+            <>
+              {/* Thread header */}
+              <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-700 flex-shrink-0">
+                <p className="font-semibold text-sm text-slate-900 dark:text-white">
+                  {selectedConv?.senderName}
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono">{selected}</p>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2">
+                {selectedConv?.messages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className={`max-w-[70%] px-3 py-2 rounded-2xl text-sm leading-snug break-words
+                        ${msg.fromMe
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-br-sm'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-bl-sm'}`}
+                    >
+                      <p>{msg.message}</p>
+                      {msg.timestamp && (
+                        <p className={`text-[10px] mt-1 opacity-50 ${msg.fromMe ? 'text-right' : ''}`}>
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Reply input */}
+              <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700 flex items-center gap-2 flex-shrink-0">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={`Reply to ${selectedConv?.senderName}…`}
+                  className={INPUT}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  className={`${BTN_PRIMARY} flex-shrink-0 disabled:opacity-40`}
+                >
+                  Send
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
-const TABS = ['Overview', 'Users', 'Products', 'Orders']
+const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+const TABS = ['Overview', 'Users', 'Products', 'Orders', 'Support']
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -687,6 +889,14 @@ export default function DashboardPage() {
   const [recentUsers, setRecentUsers] = useState([])
   const [recentProducts, setRecentProducts] = useState([])
   const [loading, setLoading] = useState(true)
+
+  // ── Support chat state — lives here so socket connects on dashboard mount,
+  //    not when the Support tab is first clicked. This ensures no messages are
+  //    missed due to late socket registration.
+  const [conversations, setConversations] = useState({})
+  const [supportConnected, setSupportConnected] = useState(false)
+  const supportSocketRef = useRef(null)
+  const supportJoinedRef = useRef(false)
 
   useEffect(() => {
     if (!user) { router.push('/login'); return }
@@ -706,6 +916,44 @@ export default function DashboardPage() {
       finally { setLoading(false) }
     }
     fetchOverview()
+
+    // Connect support socket immediately — join 'support' room right away
+    // so no user messages are missed while admin hasn't clicked the Support tab
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] })
+    supportSocketRef.current = socket
+
+    socket.on('connect', () => {
+      setSupportConnected(true)
+      if (!supportJoinedRef.current) {
+        socket.emit('join_chat', 'support')
+        supportJoinedRef.current = true
+      }
+    })
+
+    socket.on('disconnect', () => setSupportConnected(false))
+
+    socket.on('receive_support_message', (data) => {
+      const { senderId, senderName, message, timestamp } = data
+      setConversations((prev) => {
+        const existing = prev[senderId] || { senderName, messages: [], unread: 0 }
+        return {
+          ...prev,
+          [senderId]: {
+            senderName: senderName || existing.senderName,
+            messages: [...existing.messages, { senderId, senderName, message, timestamp, fromMe: false }],
+            // always increment unread — SupportTab clears it when user opens the conversation
+            unread: existing.unread + 1,
+            lastTime: timestamp || new Date().toISOString(),
+          },
+        }
+      })
+    })
+
+    return () => {
+      socket.disconnect()
+      supportSocketRef.current = null
+      supportJoinedRef.current = false
+    }
   }, [user, router])
 
   if (!user || !user.isAdmin) return null
@@ -725,19 +973,29 @@ export default function DashboardPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
-          {TABS.map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 text-sm font-medium tracking-wide transition-colors border-b-2 -mb-px ${
-                activeTab === tab
-                  ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white'
-                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {TABS.map(tab => {
+            const supportUnread = tab === 'Support'
+              ? Object.values(conversations).reduce((s, c) => s + (c.unread || 0), 0)
+              : 0
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`relative px-6 py-3 text-sm font-medium tracking-wide transition-colors border-b-2 -mb-px ${
+                  activeTab === tab
+                    ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white'
+                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                {tab}
+                {supportUnread > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-bold bg-red-500 text-white rounded-full">
+                    {supportUnread}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
 
         {/* Tab content */}
@@ -747,6 +1005,7 @@ export default function DashboardPage() {
             {activeTab === 'Users' && <UsersTab />}
             {activeTab === 'Products' && <ProductsTab />}
             {activeTab === 'Orders' && <OrdersTab />}
+            {activeTab === 'Support' && <SupportTab adminId={user._id} adminName={user.name} conversations={conversations} setConversations={setConversations} connected={supportConnected} socketRef={supportSocketRef} />}
           </motion.div>
         </AnimatePresence>
 
