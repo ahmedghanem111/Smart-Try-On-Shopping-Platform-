@@ -60,6 +60,16 @@ export default function ProductDetailPage() {
 
   const [resultImage, setResultImage] = useState(null);
   const [tryOnLoading, setTryOnLoading] = useState(false);
+  const [selectedColor, setSelectedColor] = useState(null);
+
+  const availableColors = [
+    '#000000',
+    '#ffffff',
+    '#ef4444',
+    '#3b82f6',
+    '#22c55e',
+    '#f59e0b',
+  ];
 
   const loadProduct = async () => {
     setLoading(true);
@@ -198,7 +208,7 @@ const handleTryOn = async () => {
           >
             {product.glbModel ? (
               <>
-                <Model3D modelPath={product.glbModel} />
+                <Model3D modelPath={product.glbModel} color={selectedColor} />
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
                   <span className="px-4 py-2 text-xs font-medium tracking-wider text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-200 dark:border-slate-600 rounded-full">
                     Drag to rotate · Scroll to zoom
@@ -260,7 +270,7 @@ const handleTryOn = async () => {
                 </div>
                 <div className="flex gap-3">
 
-                  //Ahmed
+                  {/* Try on button */}
                   <button
                     onClick={handleTryOn}
                     className="px-4 py-3.5 bg-blue-600 text-white rounded-xl hover:opacity-90 transition"
@@ -290,6 +300,32 @@ const handleTryOn = async () => {
                     <WishlistHeart productId={product._id} size="lg" />
                   </div>
                 </div>
+
+                {product.glbModel && (
+                  <div className="mt-4">
+                    <div className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-3">Choose color</div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedColor(null)}
+                        className={`px-4 py-2 rounded-full border transition ${selectedColor === null ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
+                      >
+                        Original
+                      </button>
+                      {availableColors.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setSelectedColor(color)}
+                          className={`w-10 h-10 rounded-full border-2 transition ${selectedColor === color ? 'border-slate-900 dark:border-white' : 'border-slate-200 dark:border-slate-700'}`}
+                          style={{ backgroundColor: color }}
+                          aria-label={`Select ${color}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                   // Try-On Result
                   {tryOnLoading && <p>Processing... ⏳</p>}
                   {resultImage && (

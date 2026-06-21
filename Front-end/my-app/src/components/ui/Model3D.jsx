@@ -13,34 +13,49 @@ function Model({ url, onLoaded, color }) {
   }, [scene, onLoaded]);
 
   useEffect(() => {
-    // سيب اللون الأصلي للموديل كما هو لحد ما اليوزر يختار لون
-    if (!color) return;
+    if (color === null) {
+      clonedScene.traverse((child) => {
+        if (child.isMesh && child.material) {
+          const restore = (mat) => {
+            if (mat?.color && mat?.userData?.originalColor) {
+              mat.color.copy(mat.userData.originalColor);
+            }
+          };
 
+          if (Array.isArray(child.material)) {
+            child.material.forEach(restore);
+          } else {
+            restore(child.material);
+          }
+        }
+      });
+      return;
+    }
+
+    // أول مرة نحفظ اللون الأصلي
     clonedScene.traverse((child) => {
       if (child.isMesh && child.material) {
-        if (Array.isArray(child.material)) {
-          child.material.forEach((mat) => {
-            if (mat.color) {
-              mat.color.set(color);
-            }
-          });
-        } else {
-          if (child.material.color) {
-            child.material.color.set(color);
+        const apply = (mat) => {
+          if (!mat.userData.originalColor) {
+            mat.userData.originalColor = mat.color.clone();
           }
+          mat.color.set(color);
+        };
+
+        if (Array.isArray(child.material)) {
+          child.material.forEach(apply);
+        } else {
+          apply(child.material);
         }
       }
     });
-  }, [clonedScene, color]);
+  }, [color, clonedScene]);
 
   return <primitive object={clonedScene} />;
 }
 
-export default function Model3D({ modelPath, className = '' }) {
+export default function Model3D({ modelPath, color = null, className = '' }) {
   const [loaded, setLoaded] = useState(false);
-
-  // مفيش لون افتراضي، اعرض الموديل بلونه الأصلي
-  const [color, setColor] = useState(null);
 
   useEffect(() => {
     setLoaded(false);
@@ -48,42 +63,16 @@ export default function Model3D({ modelPath, className = '' }) {
 
   return (
     <div className={`relative w-full h-full ${className}`}>
-      {!loaded && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-sm">
-          <div className="relative w-10 h-10">
-            <div className="absolute inset-0 rounded-full border-2 border-slate-200 dark:border-slate-700" />
-            <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-slate-800 dark:border-t-white animate-spin" />
-          </div>
 
-          <span className="text-[10px] tracking-widest uppercase text-slate-400 dark:text-slate-500">
-            Loading model
-          </span>
+      {!loaded && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center">
+          <div className="w-10 h-10 border-2 border-t-black rounded-full animate-spin" />
         </div>
       )}
 
-      {/* Color Picker */}
-      <div className="absolute top-3 right-3 z-20 bg-white dark:bg-slate-800 rounded-lg p-2 shadow-lg">
-        <input
-          type="color"
-          value={color || '#ffffff'}
-          onChange={(e) => setColor(e.target.value)}
-          className="w-10 h-10 cursor-pointer border-0"
-        />
-      </div>
-
-      <Canvas
-        camera={{ position: [0, 0, 5], fov: 45 }}
-        style={{ background: 'transparent' }}
-        gl={{ alpha: true }}
-        dpr={[1, 1.5]}
-      >
+      <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
         <Suspense fallback={null}>
-          <Stage
-            environment="studio"
-            intensity={0.5}
-            adjustCamera={1.2}
-            shadows={false}
-          >
+          <Stage environment="studio" intensity={0.5}>
             <Model
               key={modelPath}
               url={modelPath}
@@ -92,14 +81,7 @@ export default function Model3D({ modelPath, className = '' }) {
             />
           </Stage>
 
-          <OrbitControls
-            enableZoom={true}
-            enablePan={false}
-            minDistance={0.5}
-            maxDistance={10}
-            autoRotate={true}
-            autoRotateSpeed={1}
-          />
+          <OrbitControls enableZoom enablePan={false} autoRotate />
         </Suspense>
       </Canvas>
     </div>
