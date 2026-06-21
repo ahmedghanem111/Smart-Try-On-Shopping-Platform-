@@ -13,14 +13,20 @@ Ear tip strategy (critical for glasses arm placement):
        This is the horizontal axis of the face.
     2. Extend outward from the hinge along that axis by arm_length.
        arm_length = face_width * ARM_REACH_FACTOR (tunable).
-    3. Optionally add a small upward offset so the arm angles slightly up
-       toward the top of the ear (realistic glasses placement).
+    3. Add a small upward offset along the perpendicular face-up vector
+       so the arm angles slightly up toward the top of the ear
+       (realistic glasses placement).
 
-  This guarantees the arm always points horizontally outward, perfectly
-  aligned with the face orientation, regardless of head tilt or turn.
+  Because the face direction vector is derived from the actual landmark
+  positions in image space, it naturally accounts for both mirrored and
+  unmirrored frames — no separate mirroring assumption needed.
 
 ARM_REACH_FACTOR = 0.55 means the arm extends 55% of face width beyond
 the hinge. Increase to push the arm endpoint further behind the head.
+
+ARM_UP_FRACTION = 0.15 controls how much the arm tip angles upward along
+the face-perpendicular axis. 0.15 = 15% of arm_reach pushed toward the
+forehead (slight upward angle toward the ear).
 """
 
 import os
@@ -47,7 +53,7 @@ RIGHT_ARM_HINGE   = 389   # where right arm leaves the frame
 # 0.5 = arm extends half a face-width outward from the hinge.
 # Increase if arms look too short, decrease if they overshoot.
 ARM_REACH_FACTOR = 0.50   # fraction of face_width; arm extends this far outward from hinge
-ARM_LIFT_FACTOR  = 0.0    # no longer used — lift is baked into ear tip Y directly
+ARM_UP_FRACTION  = 0.15   # fraction of arm_reach; slight upward angle toward ear
 
 _MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "face_landmarker.task")
 
@@ -83,8 +89,10 @@ class FaceTracker:
     def get_landmarks(self, results, frame_width, frame_height):
         """
         Extract landmarks for glasses placement.
-        ear_tip landmarks are computed analytically (not from MediaPipe indices)
-        so the arm always points correctly outward along the face plane.
+
+        ear_tip landmarks are computed analytically from the face direction
+        vector so the arm always points correctly outward along the face
+        plane, regardless of head tilt, turn, or image mirroring.
         """
         if not results or not results.face_landmarks:
             return None
@@ -114,48 +122,50 @@ class FaceTracker:
         # ── Face geometry ─────────────────────────────────────────────────────
         # Face-edge vector: left_face_edge → right_face_edge
         # This is the horizontal axis of the face, already accounting for tilt.
+        # Because it is derived from actual landmark positions in image space,
+        # it naturally adapts to both mirrored and unmirrored frames.
         face_dx   = rfe["x"] - lfe["x"]
         face_dy   = rfe["y"] - lfe["y"]
         face_width = math.sqrt(face_dx * face_dx + face_dy * face_dy)
 
-        # Unit vector pointing RIGHT along the face plane
+        # Unit vector pointing from LEFT_FACE_EDGE → RIGHT_FACE_EDGE
+        # (i.e. from subject's left → subject's right along the face plane)
         if face_width > 0:
             ux = face_dx / face_width
             uy = face_dy / face_width
         else:
             ux, uy = 1.0, 0.0
 
-        # Unit vector pointing UP along the face plane (perpendicular to face axis)
-        # In image coords y increases downward, so "up" = rotate face axis -90°
-        up_x = uy    #  perpendicular: (-uy, ux) rotates 90° CCW = "up" in image
+        # Unit vector pointing UP along the face plane (perpendicular to face axis).
+        # In image coords y increases downward, so rotating the face direction
+        # 90° clockwise gives the "up" direction: (uy, -ux).
+        up_x =  uy
         up_y = -ux
 
         arm_reach = face_width * ARM_REACH_FACTOR
-        arm_lift  = face_width * ARM_LIFT_FACTOR   # slight upward offset
 
         # ── Ear tip computation ───────────────────────────────────────────────
         #
-        # The capture canvas is drawn mirrored (ctx.scale(-1,1)) before sending
-        # to Flask. After mirroring:
-        #   lah (162) — anatomically left temple  — is on screen-LEFT  → outward = smaller x
-        #   rah (389) — anatomically right temple — is on screen-RIGHT → outward = larger  x
+        # Each ear tip extends OUTWARD from its hinge along the face direction
+        # vector, plus a small upward offset along the face-perpendicular vector
+        # (ears sit slightly above the temple corners).
         #
-        # So left ear tip goes in the -x direction, right ear tip in the +x direction.
-        # A slight upward offset (-y) is added because ears sit above the temple corners.
+        # Left hinge extends OPPOSITE to face_dir (outward from subject's left).
+        # Right hinge extends ALONG face_dir (outward from subject's right).
+        #
+        # This works correctly regardless of image mirroring because face_dir
+        # is computed from actual pixel positions — if the image is flipped,
+        # the vector flips too, so "outward" always points the right way.
 
-        frame_cx = frame_width / 2.0
-
-        # Ear tip for left hinge (162 — screen-left after mirror): go left (-x) and slightly up (-y)
         left_ear = {
-            "x": int(lah["x"] - arm_reach),
-            "y": int(lah["y"] - arm_reach * 0.15),
+            "x": int(lah["x"] - ux * arm_reach + up_x * arm_reach * ARM_UP_FRACTION),
+            "y": int(lah["y"] - uy * arm_reach + up_y * arm_reach * ARM_UP_FRACTION),
             "z": round(lah["z"] - 0.03, 4),
         }
 
-        # Ear tip for right hinge (389 — screen-right after mirror): go right (+x) and slightly up (-y)
         right_ear = {
-            "x": int(rah["x"] + arm_reach),
-            "y": int(rah["y"] - arm_reach * 0.15),
+            "x": int(rah["x"] + ux * arm_reach + up_x * arm_reach * ARM_UP_FRACTION),
+            "y": int(rah["y"] + uy * arm_reach + up_y * arm_reach * ARM_UP_FRACTION),
             "z": round(rah["z"] - 0.03, 4),
         }
 

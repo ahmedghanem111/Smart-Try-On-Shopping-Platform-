@@ -24,7 +24,7 @@ face_tracker = FaceTracker()
 print(f"[Worker {os.getpid()}] Model loaded!")
 
 _asset_cache: dict = {}
-_glasses_smoother  = LandmarkSmoother(buffer_size=4)
+_glasses_smoother  = LandmarkSmoother(buffer_size=2)
 
 
 # ── DictLandmarkSmoother ──────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ _glasses_smoother  = LandmarkSmoother(buffer_size=4)
 # This smoother averages x, y, z independently across a rolling buffer.
 
 class DictLandmarkSmoother:
-    def __init__(self, buffer_size=4):
+    def __init__(self, buffer_size=2):
         self.buffer_size = buffer_size
         self.buffer = []
 
@@ -60,7 +60,7 @@ class DictLandmarkSmoother:
         self.buffer.clear()
 
 
-_glasses_landmark_smoother = DictLandmarkSmoother(buffer_size=4)
+_glasses_landmark_smoother = DictLandmarkSmoother(buffer_size=2)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

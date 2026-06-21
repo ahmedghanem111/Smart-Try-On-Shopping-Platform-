@@ -57,7 +57,7 @@ export function landmarkToWorld(lm, frameWidth, frameHeight, canvasWidth, canvas
   return {
     x:  nx * worldWidth,    // no negation — capture canvas is already mirrored
     y: -ny * worldHeight,   // flip Y: image y-down → Three.js y-up
-    z:  lm.z * worldWidth,  // z scaled to world units
+    z:  lm.z * worldWidth ,  // z scaled to world units
   };
 }
 

@@ -3,11 +3,13 @@ Phase 5 — Glasses Overlay (Improved)
 
 Problems fixed over the basic version:
   1. Width based on face_edge points (not eye distance) — matches actual face width
-  2. Vertical anchor uses nose_bridge (168) — glasses sit ON the eyes correctly
+  2. Horizontal anchor uses face-edge midpoint — stable when head turns
+     (nose_bridge Y is retained for vertical nose-pad alignment)
   3. Perspective warp using 4 anchor points — handles head rotation correctly
      When face turns, face_edge points compress on far side naturally
   4. Opaque bbox detection — like shirt, maps actual lens region not image padding
   5. Landmark smoothing — no jitter on glasses
+  6. Supports both tuple (x, y) and dict {"x", "y", "z"} landmark formats
 """
 
 import cv2
@@ -22,10 +24,23 @@ GLASSES_VERT_OFFSET  = 0.0   # vertical shift as fraction of glasses height
                               # 0.0 = centered on nose bridge
                               # positive = shift DOWN, negative = shift UP
 FEATHER_RADIUS       = 3     # edge softness (smaller than shirt — glasses have hard frames)
-SMOOTHER_BUFFER      = 4     # frames to average
+SMOOTHER_BUFFER      = 2     # frames to average (reduced from 4 to minimize lag)
 # ─────────────────────────────────────────────────────────────────────────────
 
 _smoother = LandmarkSmoother(buffer_size=SMOOTHER_BUFFER)
+
+
+def _pt(lm):
+    """
+    Extract a 2D [x, y] numpy array from a landmark value.
+
+    Handles both formats produced by the pipeline:
+      - Dict format:  {"x": 265, "y": 200, "z": -0.034}  ← face_tracker
+      - Tuple format: (265, 200) or [265, 200]            ← legacy / tests
+    """
+    if isinstance(lm, dict):
+        return np.array([lm["x"], lm["y"]], dtype=np.float32)
+    return np.array(lm[:2], dtype=np.float32)
 
 
 def load_glasses(path: str) -> np.ndarray:
@@ -88,31 +103,21 @@ def _compute_dst_points(landmarks: dict, glasses_img: np.ndarray) -> np.ndarray:
     points naturally move closer/further from the eyes — giving us correct
     perspective foreshortening for free.
 
-    Glasses image coordinate system (after opaque bbox):
-      top-left  → left temple end (left face edge)
-      top-right → right temple end (right face edge)
-      bot-left  → left temple end (same, glasses are symmetric vertically... 
-                                   but we need 4 non-collinear points)
+    Horizontal centering uses the midpoint of the face edges (not the nose
+    bridge) so that glasses stay centered on the face when the head turns.
+    The nose protrudes and shifts faster than the face boundary, so anchoring
+    purely to it would cause the glasses to slide sideways.
 
-    Actually for glasses we use a different mapping:
-      We map the LEFT HALF of the glasses image to the left eye region
-      and the RIGHT HALF to the right eye region, with temples reaching
-      to the face edges.
-
-    Mapping:
-      image left edge center  → left face edge  (temple)
-      image right edge center → right face edge (temple)
-
-    The vertical position is anchored to nose_bridge so glasses sit
-    ON the eyes, not above or below them.
+    Vertical positioning still uses nose_bridge (landmark 168) because that
+    corresponds to the physical nose-pad height where glasses rest.
 
     Returns 4 points: [top-left, top-right, bot-left, bot-right]
     """
-    le  = np.array(landmarks["left_eye"],        dtype=np.float32)
-    re  = np.array(landmarks["right_eye"],        dtype=np.float32)
-    nb  = np.array(landmarks["nose_bridge"],      dtype=np.float32)
-    lfe = np.array(landmarks["left_face_edge"],   dtype=np.float32)
-    rfe = np.array(landmarks["right_face_edge"],  dtype=np.float32)
+    le  = _pt(landmarks["left_eye"])
+    re  = _pt(landmarks["right_eye"])
+    nb  = _pt(landmarks["nose_bridge"])
+    lfe = _pt(landmarks["left_face_edge"])
+    rfe = _pt(landmarks["right_face_edge"])
 
     img_h, img_w = glasses_img.shape[:2]
 
@@ -124,8 +129,16 @@ def _compute_dst_points(landmarks: dict, glasses_img: np.ndarray) -> np.ndarray:
     face_dir       = face_width_vec / (face_width + 1e-6)
 
     glasses_half_w = face_width * GLASSES_WIDTH_SCALE / 2
-    left_pt  = nb - face_dir * glasses_half_w    # left temple on frame
-    right_pt = nb + face_dir * glasses_half_w    # right temple on frame
+
+    # ── Horizontal anchor: face-edge midpoint ────────────────────────────────
+    # Using the geometric midpoint of face edges keeps glasses centered on the
+    # face boundary rather than the nose (which shifts on head turn).
+    # Vertical anchor is still nose_bridge Y for correct nose-pad height.
+    face_mid = (lfe + rfe) / 2
+    anchor   = np.array([face_mid[0], nb[1]], dtype=np.float32)
+
+    left_pt  = anchor - face_dir * glasses_half_w    # left temple on frame
+    right_pt = anchor + face_dir * glasses_half_w    # right temple on frame
 
     # ── Glasses height: from image aspect ratio ────────────────────────────────
     x_min, y_min, x_max, y_max = _get_opaque_bbox(glasses_img)
@@ -136,16 +149,16 @@ def _compute_dst_points(landmarks: dict, glasses_img: np.ndarray) -> np.ndarray:
     glasses_h = face_width * GLASSES_WIDTH_SCALE * aspect
     half_h    = glasses_h / 2
 
-    # ── Vertical anchor: nose bridge ──────────────────────────────────────────
-    # Nose bridge sits right at the nose pad of the glasses.
-    # We center the glasses vertically on the nose bridge.
+    # ── Vertical extent: perpendicular to face axis ──────────────────────────
+    # perp_dir points "downward" in the face-local frame (perpendicular to
+    # the face-edge axis, into increasing image-y when the face is upright).
     # GLASSES_VERT_OFFSET shifts up/down for fine tuning.
     perp_dir = np.array([-face_dir[1], face_dir[0]])   # perpendicular to face line
     center_y_offset = perp_dir * half_h * GLASSES_VERT_OFFSET
 
     # Top and bottom of the glasses frame
-    top_center = nb - perp_dir * half_h + center_y_offset
-    bot_center = nb + perp_dir * half_h + center_y_offset
+    top_center = anchor - perp_dir * half_h + center_y_offset
+    bot_center = anchor + perp_dir * half_h + center_y_offset
 
     # Final 4 corners
     top_left  = top_center - face_dir * glasses_half_w
