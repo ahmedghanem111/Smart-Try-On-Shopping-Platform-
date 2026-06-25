@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
@@ -14,6 +15,25 @@ const Navbar = () => {
   const { user, logout } = useAuth()
   const { itemCount } = useCart()
   const { itemCount: wishlistCount } = useWishlist()
+  const router = useRouter()
+
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef(null)
+
+  // Focus input when search opens
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus()
+  }, [searchOpen])
+
+  const handleSearch = (e) => {
+    e.preventDefault()
+    const q = searchQuery.trim()
+    if (!q) return
+    router.push(`/search?q=${encodeURIComponent(q)}`)
+    setSearchOpen(false)
+    setSearchQuery('')
+  }
 
   const navLinks = [
     { id: 'home', label: 'Home', href: '/' },
@@ -48,6 +68,31 @@ const Navbar = () => {
                 {link.label}
               </Link>
             ))}
+
+            {/* Inline search */}
+            <form onSubmit={handleSearch} className="flex items-center gap-1">
+              {searchOpen && (
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Escape' && setSearchOpen(false)}
+                  placeholder="Search products…"
+                  className="w-40 px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-slate-500 dark:focus:border-slate-400 transition-all duration-200"
+                />
+              )}
+              <button
+                type={searchOpen && searchQuery.trim() ? 'submit' : 'button'}
+                onClick={() => { if (!searchOpen) setSearchOpen(true) }}
+                className="p-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors duration-200"
+                aria-label="Search"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+            </form>
           </div>
           <div className="hidden md:flex items-center space-x-4">
             {!user ? (
@@ -180,6 +225,31 @@ const Navbar = () => {
                 {link.label}
               </Link>
             ))}
+            {/* Mobile search */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const q = searchQuery.trim()
+                if (!q) return
+                router.push(`/search?q=${encodeURIComponent(q)}`)
+                setSearchQuery('')
+                setIsOpen(false)
+              }}
+              className="flex items-center gap-2 px-3 py-2"
+            >
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Search products…"
+                className="flex-1 px-3 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 outline-none"
+              />
+              <button type="submit" className="p-1.5 text-slate-700 dark:text-slate-300" aria-label="Search">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+            </form>
             <Link
               href="/cart"
               className="flex items-center justify-between px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors duration-200"

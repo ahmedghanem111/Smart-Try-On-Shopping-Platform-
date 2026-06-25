@@ -220,6 +220,26 @@ export default function OrderPage() {
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         {item.qty} × {item.price} EGP
                       </p>
+                      {/* Show size if it was appended to the name */}
+                      {/(XS|S|M|L|XL|XXL)/.test(item.name) && (
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                          Size: <span className="font-medium text-slate-600 dark:text-slate-300">
+                            {item.name.match(/(XS|S|M|L|XL|XXL)/)?.[1]}
+                          </span>
+                        </p>
+                      )}
+                      {/* Show color if it was appended to the name like "Name (#hex)" */}
+                      {/\(#[0-9a-fA-F]{3,6}\)/.test(item.name) && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span
+                            className="w-3 h-3 rounded-full border border-slate-300 dark:border-slate-600 flex-shrink-0"
+                            style={{ backgroundColor: item.name.match(/\((#[0-9a-fA-F]{3,6})\)/)?.[1] }}
+                          />
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">
+                            {item.name.match(/\((#[0-9a-fA-F]{3,6})\)/)?.[1]}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <span className="text-sm font-semibold text-slate-900 dark:text-white flex-shrink-0">
                       {(item.qty * item.price).toFixed(2)} EGP

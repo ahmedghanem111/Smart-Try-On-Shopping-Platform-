@@ -134,16 +134,32 @@ export default function CartPage() {
                           </h3>
                         </Link>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{item.price} EGP each</p>
+                        {item.color && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-slate-600 flex-shrink-0"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                              {item.color}
+                            </span>
+                          </div>
+                        )}
+                        {item.size && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-xs text-slate-400 dark:text-slate-500">Size: <span className="font-medium text-slate-600 dark:text-slate-300">{item.size}</span></span>
+                          </div>
+                        )}
 
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center border border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden">
-                            <button onClick={() => updateQty(productId, item.qty - 1)} className="px-3 py-1.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm" aria-label="Decrease">−</button>
+                            <button onClick={() => updateQty(productId, item.qty - 1, item.color ?? null, item.size ?? null)} className="px-3 py-1.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm" aria-label="Decrease">−</button>
                             <span className="px-4 py-1.5 text-sm font-medium text-slate-900 dark:text-white border-x border-slate-300 dark:border-slate-600 min-w-[2.5rem] text-center">{item.qty}</span>
-                            <button onClick={() => updateQty(productId, item.qty + 1)} className="px-3 py-1.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm" aria-label="Increase">+</button>
+                            <button onClick={() => updateQty(productId, item.qty + 1, item.color ?? null, item.size ?? null)} className="px-3 py-1.5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm" aria-label="Increase">+</button>
                           </div>
                           <div className="flex items-center gap-4">
                             <span className="text-base font-semibold text-slate-900 dark:text-white">{(item.price * item.qty).toFixed(2)} EGP</span>
-                            <button onClick={() => removeFromCart(productId)} className="text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors" aria-label="Remove">
+                            <button onClick={() => removeFromCart(productId, item.color ?? null, item.size ?? null)} className="text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors" aria-label="Remove">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                           </div>

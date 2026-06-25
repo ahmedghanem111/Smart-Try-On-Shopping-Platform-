@@ -69,13 +69,19 @@ export default function CheckoutPage() {
     if (!validate()) return
     setPlacing(true)
     try {
-      const orderItems = cartItems.map(i => ({
-        name: i.name,
-        qty: i.qty,
-        image: i.image,
-        price: i.price,
-        product: i.product?._id || i.product,
-      }))
+      const orderItems = cartItems.map(i => {
+        const parts = []
+        if (i.size) parts.push(i.size)
+        if (i.color) parts.push(i.color)
+        const suffix = parts.length ? ` (${parts.join(' · ')})` : ''
+        return {
+          name: `${i.name}${suffix}`,
+          qty: i.qty,
+          image: i.image,
+          price: i.price,
+          product: i.product?._id || i.product,
+        }
+      })
       const { data } = await API.post('/api/orders', {
         orderItems,
         shippingAddress: address,
@@ -256,6 +262,15 @@ export default function CheckoutPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-slate-900 dark:text-white truncate">{item.name}</p>
+                        {item.size && (
+                          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Size: <span className="font-medium text-slate-600 dark:text-slate-300">{item.size}</span></p>
+                        )}
+                        {item.color && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="w-3 h-3 rounded-full border border-slate-300 flex-shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider">{item.color}</span>
+                          </div>
+                        )}
                       </div>
                       <span className="text-sm font-medium text-slate-900 dark:text-white flex-shrink-0">{(item.price * item.qty).toFixed(2)} EGP</span>
                     </div>

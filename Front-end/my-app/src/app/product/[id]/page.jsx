@@ -58,6 +58,9 @@ export default function ProductDetailPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const [selectedColor, setSelectedColor] = useState(null);
+  const [selectedSize, setSelectedSize] = useState(null);
+
+  const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
   const availableColors = [
     '#000000',
@@ -90,7 +93,7 @@ export default function ProductDetailPage() {
   const handleAddToCart = async () => {
     if (!user) { router.push('/login'); return; }
     try {
-      await addToCart(product, qty);
+      await addToCart(product, qty, selectedColor, selectedSize);
       toast.success('Added to cart!');
     } catch (err) {
       toast.error('Failed to add to cart.');
@@ -228,6 +231,30 @@ export default function ProductDetailPage() {
                     <button onClick={() => setQty(q => Math.min(product.countInStock, q + 1))} className="px-3 py-2 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">+</button>
                   </div>
                 </div>
+
+                {/* Size selector — Clothes only */}
+                {product.category === 'Clothes' && (
+                  <div>
+                    <div className="text-sm font-medium text-slate-700 dark:text-slate-200 mb-3">Choose size</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {SIZES.map((size) => (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => setSelectedSize(s => s === size ? null : size)}
+                          className={`px-4 py-2 rounded-full border text-sm font-medium transition ${
+                            selectedSize === size
+                              ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900'
+                              : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 hover:border-slate-500 dark:hover:border-slate-400'
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3">
 
                   {/* Try On button — Clothes only → forwards to Find My Fit */}

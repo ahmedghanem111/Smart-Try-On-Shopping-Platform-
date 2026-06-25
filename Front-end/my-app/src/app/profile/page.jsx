@@ -10,7 +10,7 @@ import { motion } from 'framer-motion'
 import { API } from '@/lib/axios'
 import WishlistHeart from '@/components/ui/WishlistHeart'
 
-const tabs = ['Account', 'Measurements', 'Orders', 'Wishlist']
+const tabs = ['Account', 'Measurements', 'Orders', 'Wishlist', 'My Looks']
 
 const PAYMENT_LABELS = { cash: 'Cash on Delivery', card: 'Card', paypal: 'PayPal' }
 
@@ -123,6 +123,24 @@ function OrdersTab() {
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     {item.qty} × {item.price} EGP
                   </p>
+                  {/(XS|S|M|L|XL|XXL)/.test(item.name) && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Size: <span className="font-medium text-slate-600 dark:text-slate-300">
+                        {item.name.match(/(XS|S|M|L|XL|XXL)/)?.[1]}
+                      </span>
+                    </p>
+                  )}
+                  {/\(#[0-9a-fA-F]{3,6}\)/.test(item.name) && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <span
+                        className="w-3 h-3 rounded-full border border-slate-300 dark:border-slate-600 flex-shrink-0"
+                        style={{ backgroundColor: item.name.match(/\((#[0-9a-fA-F]{3,6})\)/)?.[1] }}
+                      />
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider">
+                        {item.name.match(/\((#[0-9a-fA-F]{3,6})\)/)?.[1]}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <span className="text-sm font-semibold text-slate-900 dark:text-white shrink-0">
                   {(item.qty * item.price).toFixed(2)} EGP
@@ -148,6 +166,111 @@ function OrdersTab() {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function MyLooksTab() {
+  const [looks, setLooks] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [successMsg, setSuccessMsg] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { data } = await API.get('/api/try-on/history')
+        setLooks(data.data || [])
+      } catch {
+        setLooks([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const handleDelete = async (id) => {
+    // Optimistic removal
+    setLooks(prev => prev.filter(l => l._id !== id))
+    try {
+      await API.delete(`/api/try-on/${id}`)
+      setSuccessMsg('Look deleted.')
+      setTimeout(() => setSuccessMsg(''), 3000)
+    } catch {
+      // Silently fail — item already removed from UI
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="animate-pulse aspect-[3/4] bg-slate-100 dark:bg-slate-800 rounded-2xl" />
+        ))}
+      </div>
+    )
+  }
+
+  if (looks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+          <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <p className="text-slate-500 dark:text-slate-400 text-base mb-4">No looks yet — try the Fitting Room!</p>
+        <Link
+          href="/find-my-fit"
+          className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-base font-medium rounded-full hover:bg-slate-700 dark:hover:bg-slate-100 transition-colors duration-200"
+        >
+          Open Fitting Room
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {successMsg && (
+        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm text-emerald-700 dark:text-emerald-400">
+          {successMsg}
+        </div>
+      )}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {looks.map((look) => (
+          <div key={look._id} className="relative group rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 aspect-[3/4]">
+            {look.resultImage && (
+              <Image
+                src={look.resultImage}
+                alt={look.description || 'Try-on result'}
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 50vw, 33vw"
+              />
+            )}
+            {/* Delete button */}
+            <button
+              onClick={() => handleDelete(look._id)}
+              className="absolute top-2 right-2 z-10 w-8 h-8 flex items-center justify-center bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-300 dark:hover:border-red-700"
+              aria-label="Delete look"
+            >
+              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+            {/* Overlay info */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-3 translate-y-1 group-hover:translate-y-0 opacity-90 transition-all">
+              {look.description && (
+                <p className="text-white text-xs font-medium line-clamp-2 mb-0.5">{look.description}</p>
+              )}
+              {look.createdAt && (
+                <p className="text-white/60 text-[10px]">{new Date(look.createdAt).toLocaleDateString()}</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -671,6 +794,19 @@ const ProfilePage = () => {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* My Looks Tab */}
+          {activeTab === 'My Looks' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">My Looks</h2>
+                <p className="text-base text-slate-500 dark:text-slate-400 mt-1">
+                  Your virtual try-on history.
+                </p>
+              </div>
+              <MyLooksTab />
             </div>
           )}
 

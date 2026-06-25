@@ -35,13 +35,20 @@ export function CartProvider({ children }) {
     }
   }
 
-  const addToCart = async (product, qty = 1) => {
+  const addToCart = async (product, qty = 1, color = null, size = null) => {
     setCartItems(prev => {
-      const existing = prev.find(i => i.product === product._id || i.product?._id === product._id)
+      // Treat same product with different color OR size as a separate cart entry
+      const existing = prev.find(i =>
+        (i.product === product._id || i.product?._id === product._id) &&
+        (i.color ?? null) === (color ?? null) &&
+        (i.size ?? null) === (size ?? null)
+      )
       let updated
       if (existing) {
         updated = prev.map(i =>
-          (i.product === product._id || i.product?._id === product._id)
+          (i.product === product._id || i.product?._id === product._id) &&
+          (i.color ?? null) === (color ?? null) &&
+          (i.size ?? null) === (size ?? null)
             ? { ...i, qty: i.qty + qty }
             : i
         )
@@ -54,6 +61,8 @@ export function CartProvider({ children }) {
             image: product.image,
             price: product.price,
             qty,
+            ...(color ? { color } : {}),
+            ...(size ? { size } : {}),
           },
         ]
       }
@@ -62,11 +71,13 @@ export function CartProvider({ children }) {
     })
   }
 
-  const updateQty = async (productId, qty) => {
-    if (qty < 1) return removeFromCart(productId)
+  const updateQty = async (productId, qty, color = null, size = null) => {
+    if (qty < 1) return removeFromCart(productId, color, size)
     setCartItems(prev => {
       const updated = prev.map(i =>
-        (i.product === productId || i.product?._id === productId)
+        (i.product === productId || i.product?._id === productId) &&
+        (i.color ?? null) === (color ?? null) &&
+        (i.size ?? null) === (size ?? null)
           ? { ...i, qty }
           : i
       )
@@ -75,10 +86,12 @@ export function CartProvider({ children }) {
     })
   }
 
-  const removeFromCart = async (productId) => {
+  const removeFromCart = async (productId, color = null, size = null) => {
     setCartItems(prev => {
-      const updated = prev.filter(
-        i => i.product !== productId && i.product?._id !== productId
+      const updated = prev.filter(i =>
+        !((i.product === productId || i.product?._id === productId) &&
+          (i.color ?? null) === (color ?? null) &&
+          (i.size ?? null) === (size ?? null))
       )
       persist(updated)
       return updated
