@@ -8,7 +8,7 @@ import {
   computeGlassesTransform,
 } from '@/lib/landmarkUtils';
 
-const FLASK_BASE        = 'http://localhost:5001';
+const FLASK_BASE        = process.env.NEXT_PUBLIC_FLASK_URL || 'https://smart-try-on-shopping-platform-ai-production.up.railway.app';
 const FRAME_INTERVAL_MS = 66;
 const CAPTURE_QUALITY   = 0.7;
 
@@ -387,7 +387,7 @@ export default function TryOnCamera({ glbModel, onClose }) {
         {aiStatus === 'error' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black z-20">
             <p className="text-white font-medium text-sm">AI Service Unavailable</p>
-            <p className="text-white/40 text-xs">Make sure the Flask server is running on port 5001</p>
+            <p className="text-white/40 text-xs">The AI service is currently unavailable. Please try again later.</p>
             <button onClick={onClose} className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition-colors">Close</button>
           </div>
         )}
