@@ -51,9 +51,10 @@ const http = require("http").createServer(app);
 const io = require("socket.io")(http, {
   cors: {
       origin: process.env.NODE_ENV === 'production'
-          ? "https://frontend.vercel.app"
+          ? [process.env.FRONTEND_URL || "https://fit-me-tau.vercel.app"].filter(Boolean)
           : "http://localhost:3000",
-      methods: ["GET", "POST"]
+      methods: ["GET", "POST"],
+      credentials: true
   }
 });
 
@@ -130,9 +131,9 @@ if (process.env.NODE_ENV === 'development') {
 
 app.use(cors({
     origin: process.env.NODE_ENV === 'production'
-        ? [process.env.FRONTEND_URL || 'https://frontend.vercel.app'].filter(Boolean)
+        ? [process.env.FRONTEND_URL || 'https://fit-me-tau.vercel.app'].filter(Boolean)
         : 'http://localhost:3000',
-          credentials: true
+    credentials: true
 }));
 
 app.get('/', (req, res) => {
